@@ -11,7 +11,9 @@ import {
   AlertCircle,
   BarChart4, 
   ShoppingBasket, 
-  DollarSign 
+  DollarSign,
+  Users,
+  Package
 } from "lucide-react"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { getDashboardData } from "@/lib/api"
@@ -20,25 +22,56 @@ import { getDashboardData } from "@/lib/api"
 function generateProfitInsights(productData: any[]) {
   if (!productData || productData.length === 0) return []
   
-  // Find products with highest and lowest profit margins
-  const sortedByProfit = [...productData].sort((a, b) => b.profit - a.profit)
-  const highestProfit = sortedByProfit[0]
-  const lowestProfit = sortedByProfit[sortedByProfit.length - 1]
+  // Check for data validity
+  if (!productData.every(p => p.name && typeof p.profit === 'number')) {
+    console.warn("Some product data is missing name or profit properties:", productData);
+    return [];
+  }
   
-  const insights = [
-    {
+  const insights = [];
+  
+  // Find top profit product using rank field or by sorting
+  const topProduct = productData.find(p => p.rank === 'top') || 
+                    [...productData]
+                      .filter(p => p && p.profit !== undefined && p.name)
+                      .sort((a, b) => b.profit - a.profit)[0];
+  
+  if (topProduct) {
+    insights.push({
       title: "Top Profit Generator",
-      description: `${highestProfit.name} is your highest profit generator with $${highestProfit.profit.toLocaleString()} in profits.`,
+      description: `${topProduct.name} is your highest profit generator with $${topProduct.profit.toLocaleString()} in profits.`,
       icon: <TrendingUp className="h-5 w-5 text-green-500" />,
       type: "success"
-    },
-    {
+    });
+  }
+  
+  // Find bottom profit product using rank field or by sorting
+  const bottomProduct = productData.find(p => p.rank === 'bottom');
+  
+  // Only add lowest profit insight if we found a bottom-ranked product and it's different from the top
+  if (bottomProduct && (!topProduct || bottomProduct.id !== topProduct.id)) {
+    insights.push({
       title: "Profit Improvement Opportunity",
-      description: `${lowestProfit.name} has the lowest profit. Consider adjusting pricing or costs.`,
+      description: `${bottomProduct.name} has the lowest profit. Consider adjusting pricing or costs.`,
       icon: <TrendingDown className="h-5 w-5 text-amber-500" />,
       type: "warning"
+    });
+  } else {
+    // If no bottom product found or it's the same as top, try finding the product with lowest profit
+    const sortedByProfit = [...productData]
+      .filter(p => p && p.profit !== undefined && p.name)
+      .sort((a, b) => a.profit - b.profit);
+    
+    if (sortedByProfit.length > 1 && sortedByProfit[0].id !== topProduct?.id) {
+      const lowestProfit = sortedByProfit[0];
+      insights.push({
+        title: "Profit Improvement Opportunity",
+        description: `${lowestProfit.name} has the lowest profit. Consider adjusting pricing or costs.`,
+        icon: <TrendingDown className="h-5 w-5 text-amber-500" />,
+        type: "warning"
+      });
     }
-  ]
+  }
   
   // Add overall profit margin insight if we have more than one product
   if (productData.length > 1) {
@@ -127,50 +160,221 @@ function generateRevenueInsights(customerData: any[], revenueData: any[]) {
 function generateProductInsights(productData: any[]) {
   if (!productData || productData.length === 0) return []
 
-  // Find best performing and worst performing products
-  const sortedByRevenue = [...productData].sort((a, b) => b.revenue - a.revenue)
-  const topProduct = sortedByRevenue[0]
-  const bottomProduct = sortedByRevenue[sortedByRevenue.length - 1]
+  // Check for data validity
+  if (!productData.every(p => p.name && typeof p.revenue === 'number')) {
+    console.warn("Some product data is missing name or revenue properties:", productData);
+    return [];
+  }
+
+  const insights = [];
   
-  const insights = [
-    {
-      title: "Top Selling Product",
-      description: `${topProduct.name} is your best-selling product generating $${topProduct.revenue.toLocaleString()} in revenue.`,
-      icon: <ShoppingBasket className="h-5 w-5 text-green-500" />,
-      type: "success"
+  // Find top revenue product using sorting
+  const sortedByRevenue = [...productData]
+    .filter(p => p && p.revenue !== undefined && p.name)
+    .sort((a, b) => b.revenue - a.revenue);
+    
+  // Safety check
+  if (sortedByRevenue.length === 0) return [];
+  
+  const topProduct = sortedByRevenue[0];
+  
+  // Add top product insight
+  insights.push({
+    title: "Top Selling Product",
+    description: `${topProduct.name} is your best-selling product generating $${topProduct.revenue.toLocaleString()} in revenue.`,
+    icon: <ShoppingBasket className="h-5 w-5 text-green-500" />,
+    type: "success"
+  });
+  
+  // Find the product with lowest revenue that's different from the top
+  const bottomProducts = sortedByRevenue
+    .filter(p => p.id !== topProduct.id)
+    .slice(-1);
+    
+  // Only add bottom product insight if we found one and it's significantly underperforming
+  if (bottomProducts.length > 0) {
+    const bottomProduct = bottomProducts[0];
+    if (bottomProduct.revenue < topProduct.revenue * 0.2) {
+      insights.push({
+        title: "Underperforming Product",
+        description: `${bottomProduct.name} is generating significantly less revenue than your top products. Consider promotion or replacement.`,
+        icon: <TrendingDown className="h-5 w-5 text-amber-500" />,
+        type: "warning"
+      });
     }
-  ]
-  
-  // Add recommendation for underperforming product
-  if (bottomProduct.revenue < topProduct.revenue * 0.2) {
-    insights.push({
-      title: "Underperforming Product",
-      description: `${bottomProduct.name} is generating significantly less revenue than your top products. Consider promotion or replacement.`,
-      icon: <TrendingDown className="h-5 w-5 text-amber-500" />,
-      type: "warning"
-    })
   }
   
   return insights
 }
 
 function generateActionableInsights(data: any) {
-  const insights = [
-    {
+  const insights = []
+  
+  // 1. Data-driven product mix recommendations
+  if (data.top_products_data && data.top_products_data.length > 0) {
+    const profitMargins = data.top_products_data.map((p: any) => ({
+      name: p.name,
+      margin: p.profit && p.revenue ? (p.profit / p.revenue) * 100 : 0
+    }))
+    
+    const highMarginProducts = profitMargins
+      .filter((p: {name: string, margin: number}) => p.margin > 30)
+      .map((p: {name: string, margin: number}) => p.name)
+      .slice(0, 3)
+    
+    const lowMarginProducts = profitMargins
+      .filter((p: {name: string, margin: number}) => p.margin < 15 && p.margin > 0)
+      .map((p: {name: string, margin: number}) => p.name)
+      .slice(0, 2)
+    
+    if (highMarginProducts.length > 0) {
+      insights.push({
+        title: "Optimize Product Mix",
+        description: `Focus on promoting high-margin products${highMarginProducts.length > 0 ? ' like ' + highMarginProducts.join(', ') : ''} while reevaluating low-margin offerings${lowMarginProducts.length > 0 ? ' such as ' + lowMarginProducts.join(', ') : ''}.`,
+        icon: <ShoppingBasket className="h-5 w-5 text-blue-500" />,
+        type: "info",
+        category: "Product Management",
+        timeframe: "medium-term",
+        priority: 3
+      })
+    }
+  } else {
+    // Fallback if no product data
+    insights.push({
       title: "Optimize Product Mix",
       description: "Focus on promoting high-margin products while reevaluating low-margin offerings.",
       icon: <ShoppingBasket className="h-5 w-5 text-blue-500" />,
-      type: "info"
-    },
-    {
+      type: "info",
+      category: "Product Management",
+      timeframe: "medium-term",
+      priority: 3
+    })
+  }
+  
+  // 2. Add price optimization insights
+  if (data.product_revenue_data && data.product_revenue_data.length > 0) {
+    const potentialProducts = data.product_revenue_data
+      .filter((p: any) => p.quantity > 100 && p.profit && p.revenue && (p.profit/p.revenue < 0.25))
+      .slice(0, 2)
+      .map((p: any) => p.name)
+    
+    if (potentialProducts.length > 0) {
+      insights.push({
+        title: "Price Optimization Opportunity",
+        description: `Consider testing higher prices for high-volume, low-margin products like ${potentialProducts.join(', ')}.`,
+        icon: <DollarSign className="h-5 w-5 text-green-500" />,
+        type: "success",
+        category: "Pricing Strategy",
+        timeframe: "short-term",
+        priority: 5
+      })
+    }
+  }
+  
+  // 3. Add customer retention recommendations
+  if (data.customer_revenue_data && data.customer_revenue_data.length > 2) {
+    const topCustomers = [...data.customer_revenue_data]
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 3)
+      .map(c => c.name)
+      
+    insights.push({
+      title: "Focus on Customer Retention",
+      description: `Develop retention strategies for key accounts like ${topCustomers.join(', ')} to secure long-term revenue.`,
+      icon: <Users className="h-5 w-5 text-blue-500" />,
+      type: "info",
+      category: "Customer Relations",
+      timeframe: "long-term",
+      priority: 4
+    })
+    
+    // Customer diversification (if top customer has much higher revenue)
+    if (data.customer_revenue_data.length >= 2) {
+      const sorted = [...data.customer_revenue_data].sort((a, b) => b.revenue - a.revenue)
+      const percentDifference = ((sorted[0].revenue - sorted[1].revenue) / sorted[1].revenue) * 100
+      
+      if (percentDifference > 50) {
+        insights.push({
+          title: "Customer Diversification",
+          description: `Reduce dependency risk by expanding your customer base beyond ${sorted[0].name}, which represents a significant revenue concentration.`,
+          icon: <CircleAlert className="h-5 w-5 text-blue-500" />,
+          type: "info",
+          category: "Customer Relations",
+          timeframe: "long-term",
+          priority: 3
+        })
+      } else {
+        insights.push({
+          title: "Customer Diversification",
+          description: "Reduce dependency risk by expanding your customer base beyond current top accounts.",
+          icon: <CircleAlert className="h-5 w-5 text-blue-500" />,
+          type: "info",
+          category: "Customer Relations",
+          timeframe: "long-term",
+          priority: 2
+        })
+      }
+    }
+  } else {
+    // Fallback if no customer data
+    insights.push({
       title: "Customer Diversification",
       description: "Reduce dependency risk by expanding your customer base beyond current top accounts.",
       icon: <CircleAlert className="h-5 w-5 text-blue-500" />,
-      type: "info"
-    }
-  ]
+      type: "info",
+      category: "Customer Relations",
+      timeframe: "long-term",
+      priority: 2
+    })
+  }
   
-  // Add seasonal recommendations if we have revenue data
+  // 4. Add trend-based recommendations
+  if (data.revenue_data && data.revenue_data.length > 3) {
+    const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    const revenueByMonth = [...data.revenue_data]
+      .sort((a, b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month))
+    
+    // Check for declining trends
+    const last3Months = revenueByMonth.slice(-3)
+    if (last3Months.length === 3) {
+      const isDeclineTrend = last3Months[2].revenue < last3Months[1].revenue && 
+                          last3Months[1].revenue < last3Months[0].revenue
+      
+      if (isDeclineTrend) {
+        insights.push({
+          title: "Reverse Revenue Decline",
+          description: `Revenue has declined for 3 consecutive months (${last3Months.map(m => m.month).join(', ')}). Consider promotional campaigns or new product introductions.`,
+          icon: <TrendingUp className="h-5 w-5 text-amber-500" />,
+          type: "warning",
+          category: "Pricing Strategy",
+          timeframe: "short-term",
+          priority: 5
+        })
+      }
+    }
+  }
+  
+  // 5. Add inventory management recommendations
+  if (data.product_revenue_data && data.product_revenue_data.length > 0) {
+    const slowMovingProducts = data.product_revenue_data
+      .filter((p: any) => p.quantity < 10 && p.revenue > 0)
+      .slice(0, 2)
+      .map((p: any) => p.name)
+    
+    if (slowMovingProducts.length > 0) {
+      insights.push({
+        title: "Inventory Optimization",
+        description: `Consider reducing inventory for slow-moving products like ${slowMovingProducts.join(', ')} to improve cash flow.`,
+        icon: <Package className="h-5 w-5 text-blue-500" />,
+        type: "info",
+        category: "Product Management",
+        timeframe: "short-term",
+        priority: 3
+      })
+    }
+  }
+  
+  // 6. Add seasonal recommendations if we have revenue data
   if (data.revenue_data && data.revenue_data.length > 0) {
     const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     const revenueByMonth = [...data.revenue_data].sort((a, b) => 
@@ -187,17 +391,21 @@ function generateActionableInsights(data: any) {
       curr.revenue < min.revenue ? curr : min, revenueByMonth[0]
     )
     
-    if (maxRevenueMonth.month !== minRevenueMonth.month) {
+    if (maxRevenueMonth && minRevenueMonth && maxRevenueMonth.month !== minRevenueMonth.month) {
       insights.push({
         title: "Seasonal Strategy",
         description: `Plan inventory and promotions around your peak month (${maxRevenueMonth.month}) and develop strategies to boost sales during slower months like ${minRevenueMonth.month}.`,
         icon: <BarChart4 className="h-5 w-5 text-purple-500" />,
-        type: "info"
+        type: "info",
+        category: "Planning",
+        timeframe: "long-term",
+        priority: 4
       })
     }
   }
   
-  return insights
+  // 7. Sort insights by priority
+  return insights.sort((a, b) => b.priority - a.priority)
 }
 
 export default function InsightsPage() {
@@ -243,7 +451,7 @@ export default function InsightsPage() {
   return (
     <div className="container py-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">AI Insights</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Actionable Insights</h1>
       </div>
 
       {error && (
@@ -315,13 +523,23 @@ export default function InsightsPage() {
               <Card key={index}>
                 <CardHeader className="flex flex-row items-center gap-2">
                   {insight.icon}
-                  <CardTitle className="text-lg">{insight.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                  <div className="flex flex-col">
+                    <CardTitle className="text-lg">{insight.title}</CardTitle>
+                    {insight.category && (
+                      <div className="flex items-center mt-1 text-xs text-muted-foreground">
+                        <span className="mr-3">{insight.category}</span>
+                        {insight.timeframe && (
+                          <span className="px-1.5 py-0.5 bg-muted rounded-full">{insight.timeframe}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
                   <CardDescription className="text-base">{insight.description}</CardDescription>
-                  </CardContent>
-                </Card>
-              ))}
+                </CardContent>
+              </Card>
+            ))}
         </TabsContent>
       </Tabs>
       )}

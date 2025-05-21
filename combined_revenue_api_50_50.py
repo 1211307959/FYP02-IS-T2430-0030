@@ -131,6 +131,12 @@ def get_dashboard_data():
         # Load the data
         df = pd.read_csv(file_path)
         
+        # Perform initial validation of required columns
+        required_columns = ['_ProductID', 'Unit Price', 'Unit Cost', 'Total Revenue']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Warning: Missing columns for proper calculations: {missing_columns}")
+        
         # Generate revenue over time data (monthly aggregation)
         # Add month-year field if not present
         if 'Month' in df.columns and 'Year' in df.columns:
@@ -144,20 +150,25 @@ def get_dashboard_data():
         # Revenue by month
         revenue_data = []
         if 'Total Revenue' in df.columns:
-            # Calculate profit if needed columns exist
-            has_profit_data = 'Unit Price' in df.columns and 'Unit Cost' in df.columns and 'Quantity' in df.columns
+            # Check for columns needed for proper profit calculation
+            has_profit_data = all(col in df.columns for col in ['Unit Price', 'Unit Cost', 'Quantity'])
             
             # Debug statement
             print(f"Has all columns for profit calculation: {has_profit_data}")
             print(f"Columns in DataFrame: {df.columns.tolist()}")
             
+            # Calculate profit if possible, otherwise estimate
             if has_profit_data:
                 df['Profit'] = (df['Unit Price'] - df['Unit Cost']) * df['Quantity']
                 # Verify profit is calculated
                 print(f"Sample profit values: {df['Profit'].head(3).tolist()}")
+            elif all(col in df.columns for col in ['Unit Price', 'Unit Cost']):
+                # If we have price and cost but no quantity, assume quantity of 1
+                df['Profit'] = (df['Unit Price'] - df['Unit Cost']) * 1
+                print("Using assumed quantity of 1 for profit calculation")
             
             # Group by month and calculate total revenue and profit
-            if has_profit_data:
+            if 'Profit' in df.columns:
                 monthly_data = df.groupby('MonthYear').agg({
                     'Total Revenue': 'sum',
                     'Profit': 'sum'
@@ -173,7 +184,7 @@ def get_dashboard_data():
                 }
                 
                 # Add profit if available from actual data or estimate it as 40% of revenue
-                if has_profit_data:
+                if 'Profit' in df.columns:
                     data_point['profit'] = round(float(row['Profit']), 2)
                 else:
                     # Estimate profit as 40% of revenue if we don't have the actual profit data
@@ -199,19 +210,26 @@ def get_dashboard_data():
         product_revenue_data = []
         if '_ProductID' in df.columns and 'Total Revenue' in df.columns:
             # Group by product and calculate total revenue
-            product_revenue = df.groupby('_ProductID')['Total Revenue'].sum().reset_index()
+            product_revenue = df.groupby('_ProductID').agg({
+                'Total Revenue': 'sum'
+            }).reset_index()
             
             # Convert to list of dicts for the chart
             for _, row in product_revenue.iterrows():
+                product_id = row['_ProductID']
                 product_revenue_data.append({
-                    'product': f"Product {row['_ProductID']}",
+                    'id': int(product_id),
+                    'product': f"Product {product_id}",
+                    'name': f"Product {product_id}",
                     'revenue': round(float(row['Total Revenue']), 2)
                 })
         else:
             # Sample data if no required columns
             for i in range(1, 6):
                 product_revenue_data.append({
+                    'id': i,
                     'product': f"Product {i}",
+                    'name': f"Product {i}",
                     'revenue': round(5000 + i * 2000 + np.random.randint(1000), 2)
                 })
         
@@ -237,39 +255,117 @@ def get_dashboard_data():
                     'revenue': round(7000 + np.random.randint(5000), 2)
                 })
         
-        # Top profitable products
+        # Top profitable products - FIXED implementation
         top_products_data = []
-        if '_ProductID' in df.columns and 'Unit Price' in df.columns and 'Unit Cost' in df.columns and 'Quantity' in df.columns:
+        bottom_products_data = []
+        
+        # Check if we have all required columns for profit calculation
+        if all(col in df.columns for col in ['_ProductID', 'Unit Price', 'Unit Cost']):
+            # Ensure quantity is available or default to 1
+            if 'Quantity' not in df.columns:
+                df['Quantity'] = 1
+                print("Using default quantity of 1 for all products")
+            
             # Calculate profit for each row
             df['Profit'] = (df['Unit Price'] - df['Unit Cost']) * df['Quantity']
             
-            # Group by product and calculate total profit
+            # Group by product and calculate aggregates
             product_profit = df.groupby('_ProductID').agg({
                 'Profit': 'sum',
-                'Quantity': 'sum'
+                'Quantity': 'sum',
+                'Total Revenue': 'sum'  # For margin calculation
             }).reset_index()
             
-            # Sort by profit (descending) and take top 5
+            # Add profit margin calculation if possible
+            if 'Total Revenue' in product_profit.columns:
+                product_profit['Margin'] = product_profit.apply(
+                    lambda x: x['Profit'] / x['Total Revenue'] if x['Total Revenue'] > 0 else 0, 
+                    axis=1
+                )
+            
+            # Get top 5 products by profit
             top_products = product_profit.sort_values('Profit', ascending=False).head(5)
             
-            # Convert to list of dicts for the chart
+            # Get bottom 5 products by profit - separate query to ensure different products
+            bottom_products = product_profit.sort_values('Profit', ascending=True).head(5)
+            
+            # Log product counts for debugging
+            print(f"Total unique products: {len(product_profit)}")
+            print(f"Top products count: {len(top_products)}")
+            print(f"Bottom products count: {len(bottom_products)}")
+            
+            # Extract product IDs for comparison
+            top_product_ids = set(top_products['_ProductID'].tolist())
+            bottom_product_ids = set(bottom_products['_ProductID'].tolist())
+            
+            # Log for debugging
+            print(f"Top product IDs: {top_product_ids}")
+            print(f"Bottom product IDs: {bottom_product_ids}")
+            print(f"Overlap in IDs: {top_product_ids.intersection(bottom_product_ids)}")
+            
+            # Only include a product in both lists if there are enough unique products
+            allow_overlap = len(product_profit) <= 5
+            
+            # Convert top products to list of dicts
             for _, row in top_products.iterrows():
-                # Use the actual profit value, which might be much larger than shown previously
+                product_id = int(row['_ProductID'])
                 profit_value = float(row['Profit'])
+                margin_value = float(row['Margin']) if 'Margin' in row else 0
+                
                 top_products_data.append({
-                    'name': f"Product {row['_ProductID']}",
-                    'product': f"Product {row['_ProductID']}",  # Keep this for backward compatibility
+                    'id': product_id,
+                    'name': f"Product {product_id}",
+                    'product': f"Product {product_id}",  # For backward compatibility
                     'profit': round(profit_value, 2),
-                    'quantity': int(row['Quantity'])
+                    'quantity': int(row['Quantity']),
+                    'revenue': float(row['Total Revenue']) if 'Total Revenue' in row else 0,
+                    'margin': round(margin_value * 100, 2),  # Convert to percentage
+                    'rank': 'top'
                 })
+            
+            # Add bottom products, avoiding duplicates unless we have too few products
+            for _, row in bottom_products.iterrows():
+                product_id = int(row['_ProductID'])
+                
+                # Skip if this product is already in the top list and we have enough products
+                if product_id in top_product_ids and not allow_overlap:
+                    continue
+                    
+                profit_value = float(row['Profit'])
+                margin_value = float(row['Margin']) if 'Margin' in row else 0
+                
+                bottom_products_data.append({
+                    'id': product_id,
+                    'name': f"Product {product_id}",
+                    'product': f"Product {product_id}",  # For backward compatibility
+                    'profit': round(profit_value, 2),
+                    'quantity': int(row['Quantity']),
+                    'revenue': float(row['Total Revenue']) if 'Total Revenue' in row else 0,
+                    'margin': round(margin_value * 100, 2),  # Convert to percentage
+                    'rank': 'bottom'
+                })
+            
+            # Log counts for verification
+            print(f"Final top products count: {len(top_products_data)}")
+            print(f"Final bottom products count: {len(bottom_products_data)}")
+            
+            # Combine data, ensure no duplicates
+            top_products_data.extend([p for p in bottom_products_data if p['id'] not in [tp['id'] for tp in top_products_data]])
+            
         else:
-            # Sample data if no required columns - use larger values to match the revenue scale
+            # Sample data if no required columns - use more realistic values
+            print("Creating sample product profit data due to missing columns")
             for i in range(1, 6):
+                # Top products have higher profits
                 top_products_data.append({
+                    'id': i,
                     'name': f"Product {i}",
-                    'product': f"Product {i}",  # Keep this for backward compatibility
-                    'profit': round(3000000 + i * 1000000 + np.random.randint(1000000), 2),
-                    'quantity': 10000 + i * 5000
+                    'product': f"Product {i}",  # For backward compatibility
+                    'profit': round(1000000 + i * 500000 + np.random.randint(500000), 2),
+                    'quantity': 5000 + i * 1000,
+                    'revenue': round(2500000 + i * 1000000, 2),
+                    'margin': round(40 + i * 2, 2),  # Percentage
+                    'rank': 'top' if i > 2 else 'bottom'
                 })
         
         # Calculate summary metrics
@@ -281,8 +377,9 @@ def get_dashboard_data():
         product_revenue_data_fixed = []
         for item in product_revenue_data:
             product_revenue_data_fixed.append({
-                'name': item['product'],
-                'revenue': item['revenue']
+                'name': item['name'],
+                'revenue': item['revenue'],
+                'id': item.get('id', 0)
             })
         product_revenue_data = product_revenue_data_fixed
         
@@ -300,6 +397,8 @@ def get_dashboard_data():
         })
     except Exception as e:
         print(f"Error getting dashboard data: {str(e)}")
+        import traceback
+        traceback.print_exc()  # Print full stack trace for better debugging
         return jsonify({
             'status': 'error',
             'error': f"Failed to get dashboard data: {str(e)}"
