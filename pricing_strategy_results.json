@@ -1,0 +1,49 @@
+{
+  "product": {
+    "name": "Premium Widget XL",
+    "product_id": 12,
+    "base_cost": 75,
+    "current_price": 150,
+    "location": "North"
+  },
+  "context": {
+    "month": 6,
+    "day": 15,
+    "weekday": "Wednesday",
+    "year": 2023,
+    "is_holiday_season": false
+  },
+  "current_results": {
+    "predicted_revenue": 11880.032895753457,
+    "estimated_quantity": 79,
+    "total_cost": 5925,
+    "profit": 5955.032895753457,
+    "profit_margin_pct": 50.12640072639947,
+    "unit_price": 150,
+    "unit_cost": 75
+  },
+  "optimization_results": {
+    "revenue_optimization": {
+      "unit_price": 169.73684210526315,
+      "revenue": 11900.258959211891,
+      "quantity": 70,
+      "profit": 6650.258959211891,
+      "price_factor": 1.131578947368421
+    },
+    "profit_optimization": {
+      "unit_price": 300.0,
+      "revenue": 11062.506612176303,
+      "quantity": 37,
+      "profit": 8287.506612176303,
+      "price_factor": 2.0
+    }
+  },
+  "strategy": {
+    "current_price": 150,
+    "revenue_optimal": 169.73684210526315,
+    "profit_optimal": 300.0,
+    "revenue_difference_pct": 13.157894736842099,
+    "profit_difference_pct": 100.0,
+    "recommendation": "increase"
+  }
+}

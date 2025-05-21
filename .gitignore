@@ -1,0 +1,46 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Large model files
+*.pkl
+best_direct_revenue_model.pkl
+advanced_lgb_quantity_model.pkl
+advanced_quantity_model_data.pkl
+advanced_stacking_quantity_model.pkl
+best_quantity_model.pkl
+best_revenue_model_ethical.pkl
+best_revenue_model_full_data.pkl
+best_revenue_model_improved.pkl
+best_revenue_model_modified.pkl
+best_revenue_model_no_quantity.pkl
+enhanced_revenue_model_ethical.pkl
+revenue_model_50_50_split.pkl
+rf_quantity_model.pkl
+rf_revenue_model.pkl
+rf_total_revenue_model.pkl
+xgb_quantity_model.pkl
