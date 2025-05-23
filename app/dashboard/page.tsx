@@ -1,11 +1,13 @@
 "use client"
 
+export const dynamic = 'force-dynamic'; // Force page to be dynamically rendered, no caching
+
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { BarChart, LineChart, CartesianGrid, XAxis, YAxis, Legend, Bar, Line, ResponsiveContainer, Tooltip } from "recharts"
-import { ArrowUpRight, DollarSign, ShoppingCart, TrendingUp, AlertCircle, FileText, RefreshCw } from "lucide-react"
+import { ArrowUpRight, DollarSign, ShoppingCart, TrendingUp, AlertCircle, FileText, RefreshCw, ListFilter, X } from "lucide-react"
 import { checkApiHealth, getDashboardData, getDataFiles, selectDataFile, reloadDataFiles } from "@/lib/api"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -13,6 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/use-toast"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { useRouter } from "next/navigation"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 // Data File Selector Component
 const DataFileSelector = ({ onFileChange }: { onFileChange: () => void }) => {
@@ -109,7 +114,17 @@ const DataFileSelector = ({ onFileChange }: { onFileChange: () => void }) => {
   )
 }
 
+interface Product {
+  id: number;
+  name: string;
+  rank?: string;
+  profit: number;
+  revenue: number;
+}
+
 export default function DashboardPage() {
+  // Add the router for refresh capability
+  const router = useRouter();
   // State for API status
   const [apiStatus, setApiStatus] = useState("loading")
   // State for loading indicators
@@ -120,11 +135,15 @@ export default function DashboardPage() {
   const [revenueData, setRevenueData] = useState<any[]>([])
   const [productRevenueData, setProductRevenueData] = useState<any[]>([])
   const [customerRevenueData, setCustomerRevenueData] = useState<any[]>([])
-  const [topProductsData, setTopProductsData] = useState<any[]>([])
+  const [topProductsData, setTopProductsData] = useState<Product[]>([])
+  const [allProductsData, setAllProductsData] = useState<Product[]>([])
+  const [showAllProductsModal, setShowAllProductsModal] = useState(false)
   const [totalPredictedRevenue, setTotalPredictedRevenue] = useState(0)
   const [totalSales, setTotalSales] = useState(0)
   const [averageRevenuePerSale, setAverageRevenuePerSale] = useState(0)
   const [showProfit, setShowProfit] = useState(false)
+
+  const NUM_TOP_PRODUCTS = 10; // Show top 10 products
   
   useEffect(() => {
     // Check API health when component mounts
@@ -138,57 +157,109 @@ export default function DashboardPage() {
     }
     
     // Fetch dashboard data from the API
-    const fetchDashboardData = async () => {
-      setIsLoading(true)
-      setError("")
-      
-      try {
-        const data = await getDashboardData()
-        
-        // Update state with the fetched data
-        console.log("Revenue data from API:", data.revenue_data);
-        
-        // Check if profit data exists in the response
-        const hasProfitData = data.revenue_data && 
-                             data.revenue_data.length > 0 && 
-                             'profit' in data.revenue_data[0];
-                             
-        console.log("Has profit data:", hasProfitData);
-        
-        // If profit data is missing, add it as a calculated field (40% of revenue)
-        const enhancedRevenueData = data.revenue_data.map(item => ({
-          ...item,
-          profit: item.profit || Math.round(item.revenue * 0.4)
-        }));
-        
-        setRevenueData(enhancedRevenueData || []);
-        setProductRevenueData(data.product_revenue_data || [])
-        setCustomerRevenueData(data.customer_revenue_data || [])
-        setTopProductsData(data.top_products_data || [])
-        setTotalPredictedRevenue(data.total_revenue || 0)
-        setTotalSales(data.total_sales || 0)
-        setAverageRevenuePerSale(data.avg_revenue_per_sale || 0)
-      } catch (err) {
-        console.error("Error fetching dashboard data:", err)
-        setError("Failed to load dashboard data. Please try again later.")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    
-    checkApi()
-    fetchDashboardData()
+    fetchDashboardData();
+    checkApi();
   }, [])
 
   // Handle data file change
   const handleDataFileChange = () => {
-    fetchDashboardData()
+    // Force a full refresh of the router to clear any client-side caching
+    router.refresh();
+    fetchDashboardData();
   }
+
+  // Add function to trigger manual refresh
+  const handleRefresh = () => {
+    router.refresh();
+    fetchDashboardData();
+  }
+  
+  // Define a function to process product data
+  const processProductData = (data: any) => {
+    if (!data?.top_products_data || !Array.isArray(data.top_products_data)) {
+      console.warn("Missing or invalid product data");
+      return { topProducts: [], allProducts: [] };
+    }
+
+    // Get all products and sort by profit
+    const allProducts = [...data.top_products_data];
+    const sortedAllProducts = [...allProducts].sort((a, b) => b.profit - a.profit);
+    
+    // Get top 10 products by profit
+    const top10Products = sortedAllProducts.slice(0, NUM_TOP_PRODUCTS);
+    
+    console.log(`Displaying ${top10Products.length} top products out of ${sortedAllProducts.length} total products`);
+    
+    return { 
+      topProducts: top10Products,
+      allProducts: sortedAllProducts
+    };
+  };
+  
+  const fetchDashboardData = async () => {
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      // Add cache busting parameter
+      const timestamp = new Date().getTime();
+      const data = await getDashboardData(`?_=${timestamp}`);
+      
+      console.log("Dashboard data received:", data);
+      
+      // Process product data
+      const { topProducts, allProducts } = processProductData(data);
+      
+      // Store processed data
+      setTopProductsData(topProducts);
+      setAllProductsData(allProducts);
+      
+      // Check if profit data exists in the response
+      const hasProfitData = data.revenue_data && 
+                           data.revenue_data.length > 0 && 
+                           'profit' in data.revenue_data[0];
+                           
+      console.log("Has profit data:", hasProfitData);
+      
+      // If profit data is missing, add it as a calculated field (40% of revenue)
+      interface RevenueDataItem {
+        month: string;
+        revenue: number;
+        profit?: number;
+      }
+      
+      const enhancedRevenueData = data.revenue_data?.map((item: RevenueDataItem) => ({
+        ...item,
+        profit: item.profit || Math.round(item.revenue * 0.4)
+      })) || [];
+      
+      setRevenueData(enhancedRevenueData);
+      setProductRevenueData(data.product_revenue_data || []);
+      setCustomerRevenueData(data.customer_revenue_data || []);
+      setTotalPredictedRevenue(data.total_revenue || 0);
+      setTotalSales(data.total_sales || 0);
+      setAverageRevenuePerSale(data.avg_revenue_per_sale || 0);
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+      setError("Failed to load dashboard data. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="container py-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <Button 
+          variant="outline" 
+          onClick={handleRefresh} 
+          disabled={isLoading}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Refresh Data
+        </Button>
       </div>
 
       <DataFileSelector onFileChange={handleDataFileChange} />
@@ -262,7 +333,7 @@ export default function DashboardPage() {
           <TabsTrigger value="revenue">Revenue Over Time</TabsTrigger>
           <TabsTrigger value="products">Revenue by Product</TabsTrigger>
           <TabsTrigger value="customers">Revenue by Location</TabsTrigger>
-          <TabsTrigger value="profitable">Top Profitable Products</TabsTrigger>
+          <TabsTrigger value="profitable">Profitable Products</TabsTrigger>
         </TabsList>
 
         <TabsContent value="revenue">
@@ -284,7 +355,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="h-[400px]">
+            <CardContent className="h-[600px]">
               <ChartContainer
                 config={{
                   revenue: {
@@ -304,7 +375,7 @@ export default function DashboardPage() {
                       top: 20,
                       right: 30,
                       left: 20,
-                      bottom: 5,
+                      bottom: 20,
                     }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
@@ -345,7 +416,7 @@ export default function DashboardPage() {
               <CardTitle>Revenue by Product</CardTitle>
               <CardDescription>Distribution of revenue across different products</CardDescription>
             </CardHeader>
-            <CardContent className="h-[400px]">
+            <CardContent className="h-[600px]">
               <ChartContainer
                 config={{
                   revenue: {
@@ -361,8 +432,10 @@ export default function DashboardPage() {
                       top: 20,
                       right: 30,
                       left: 20,
-                      bottom: 5,
+                      bottom: 20,
                     }}
+                    barCategoryGap={4} // Reduce gap between categories
+                    barGap={2} // Reduce gap between bars in same category
                   >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
@@ -371,7 +444,12 @@ export default function DashboardPage() {
                       content={<ChartTooltipContent formatter={(value) => `$${Number(value).toLocaleString()}`} />}
                     />
                     <Legend />
-                    <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} />
+                    <Bar 
+                      dataKey="revenue" 
+                      fill="var(--color-revenue)" 
+                      radius={[4, 4, 0, 0]}
+                      barSize={30} // Adjusted bar size
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -385,7 +463,7 @@ export default function DashboardPage() {
               <CardTitle>Revenue by Location</CardTitle>
               <CardDescription>Distribution of revenue across different locations</CardDescription>
             </CardHeader>
-            <CardContent className="h-[400px]">
+            <CardContent className="h-[600px]">
               <ChartContainer
                 config={{
                   revenue: {
@@ -401,8 +479,10 @@ export default function DashboardPage() {
                       top: 20,
                       right: 30,
                       left: 20,
-                      bottom: 5,
+                      bottom: 20,
                     }}
+                    barCategoryGap={4} // Reduce gap between categories
+                    barGap={2} // Reduce gap between bars in same category
                   >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
@@ -411,7 +491,12 @@ export default function DashboardPage() {
                       content={<ChartTooltipContent formatter={(value) => `$${Number(value).toLocaleString()}`} />}
                     />
                     <Legend />
-                    <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} />
+                    <Bar 
+                      dataKey="revenue" 
+                      fill="var(--color-revenue)" 
+                      radius={[4, 4, 0, 0]} 
+                      barSize={30} // Adjusted bar size 
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -422,10 +507,22 @@ export default function DashboardPage() {
         <TabsContent value="profitable">
           <Card>
             <CardHeader>
-              <CardTitle>Top 5 Profitable Products</CardTitle>
-              <CardDescription>Products with the highest profit margins</CardDescription>
+              <div className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Top {NUM_TOP_PRODUCTS} Profitable Products</CardTitle>
+                  <CardDescription>Products with the highest profit margins</CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowAllProductsModal(true)}
+                  className="flex items-center gap-2"
+                >
+                  <ListFilter className="h-4 w-4" />
+                  Show All Products
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="h-[400px]">
+            <CardContent className="h-[600px]">
               <ChartContainer
                 config={{
                   profit: {
@@ -440,19 +537,39 @@ export default function DashboardPage() {
                     layout="vertical"
                     margin={{
                       top: 20,
-                      right: 30,
+                      right: 60, // Increase right margin to accommodate full bars
                       left: 100,
-                      bottom: 5,
+                      bottom: 20, // Increased from 5 to ensure bottom grid coverage
                     }}
+                    barCategoryGap={1} // Minimize gap between categories
+                    barGap={0} // Minimize gap between bars in same category
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" tickFormatter={(value) => `$${value.toLocaleString()}`} />
-                    <YAxis type="category" dataKey="name" />
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} />
+                    <XAxis 
+                      type="number" 
+                      tickFormatter={(value) => `$${value.toLocaleString()}`} 
+                      domain={[0, 'dataMax']} // Ensure axis accommodates full data range
+                      padding={{ left: 0, right: 30 }} // Add padding to the axis
+                      allowDataOverflow={false} // Don't allow data to overflow the axis
+                    />
+                    <YAxis 
+                      type="category" 
+                      dataKey="name" 
+                      interval={0} 
+                      width={90}
+                      padding={{ top: 10, bottom: 10 }} // Add padding to prevent cutoff
+                    />
                     <ChartTooltip
                       content={<ChartTooltipContent formatter={(value) => `$${Number(value).toLocaleString()}`} />}
                     />
                     <Legend />
-                    <Bar dataKey="profit" fill="var(--color-profit)" radius={[0, 4, 4, 0]} />
+                    <Bar 
+                      dataKey="profit" 
+                      fill="var(--color-profit)" 
+                      radius={[0, 4, 4, 0]} 
+                      barSize={28} // Adjusted bar size for better visibility
+                      isAnimationActive={false} // Disable animation to avoid potential issues with sizing
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -460,6 +577,45 @@ export default function DashboardPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog for showing all products */}
+      <Dialog open={showAllProductsModal} onOpenChange={setShowAllProductsModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>All Products Ranked by Profit</DialogTitle>
+            <DialogDescription>
+              Complete ranking of all {allProductsData.length} products by profit
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Rank</TableHead>
+                <TableHead>Product ID</TableHead>
+                <TableHead>Product Name</TableHead>
+                <TableHead className="text-right">Profit</TableHead>
+                <TableHead className="text-right">Revenue</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {allProductsData.map((product, index) => (
+                <TableRow key={product.id} className={index < NUM_TOP_PRODUCTS ? "bg-green-50" : ""}>
+                  <TableCell className="font-medium">{index + 1}</TableCell>
+                  <TableCell>{product.id}</TableCell>
+                  <TableCell>{product.name}</TableCell>
+                  <TableCell className="text-right">${product.profit.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">${product.revenue?.toLocaleString() || "-"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setShowAllProductsModal(false)}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
         </>
       )}
     </div>

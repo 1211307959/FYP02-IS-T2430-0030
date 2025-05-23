@@ -154,9 +154,26 @@ export async function getCustomers() {
 /**
  * Get dashboard data
  */
-export async function getDashboardData() {
+export async function getDashboardData(cacheBustQuery?: string) {
   try {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard-data`);
+    // Fix the URL construction - don't append query string directly
+    const baseUrl = `${API_BASE_URL}/dashboard-data`;
+    
+    // If we have a query string that starts with ?, use it, otherwise create one
+    const queryString = cacheBustQuery && cacheBustQuery.startsWith('?') 
+      ? cacheBustQuery 
+      : `?_=${new Date().getTime()}`;
+    
+    const url = `${baseUrl}${queryString}`;
+    console.log(`Fetching dashboard data from: ${url}`);
+    
+    const response = await fetchWithTimeout(url, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
     
     if (!response.ok) {
       throw new Error('Failed to fetch dashboard data');

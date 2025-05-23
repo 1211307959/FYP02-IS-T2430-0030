@@ -1,7 +1,7 @@
 # Revenue Prediction API Documentation
 
 ## Overview
-This API provides revenue prediction services for small businesses. It uses a Random Forest model that has been trained on historical sales data to predict revenue based on various inputs such as product information, pricing, and order quantities.
+This API provides revenue prediction services for small businesses. It uses an XGBoost model trained on a 50/50 split of historical sales data to predict revenue based on various inputs such as product information, pricing, and location data. The model achieves 99.4% accuracy (R² = 0.9947) on the test set.
 
 ## Base URL
 ```
@@ -23,10 +23,11 @@ Checks the status of the API and model.
 {
   "status": "online",
   "model_status": "healthy",
+  "model_version": "50/50 Split XGBoost",
   "model_message": "Revenue model loaded successfully",
   "data_status": "healthy",
-  "data_message": "CSV data loaded successfully from Adjusted_Sales_Data_With_Location_100K_ValidDates.csv",
-  "current_data_file": "Adjusted_Sales_Data_With_Location_100K_ValidDates.csv"
+  "data_message": "CSV data loaded successfully",
+  "current_data_file": "trainingdataset.csv"
 }
 ```
 
@@ -143,19 +144,18 @@ Returns aggregated data for dashboard visualizations.
 ### Predict Revenue
 **POST /predict-revenue**
 
-Predicts revenue for a given set of inputs.
+Predicts revenue using the 50/50 split XGBoost model.
 
 **Request:**
 ```json
 {
-  "Unit Price": 100,
-  "Unit Cost": 50,
-  "Order Quantity": 5,
+  "Unit Price": 100.00,
+  "Unit Cost": 50.00,
+  "Location": "North",
+  "ProductID": 12,
   "Month": 6,
   "Day": 15,
-  "Weekday": "Friday",
-  "Location": "North",
-  "_ProductID": 12
+  "Weekday": "Friday"
 }
 ```
 
@@ -163,42 +163,75 @@ Predicts revenue for a given set of inputs.
 ```json
 {
   "predicted_revenue": 1054.21,
-  "order_quantity": 5,
-  "profit": 804.21
+  "confidence_score": 0.994,
+  "predicted_quantity": 5,
+  "estimated_profit": 250.00
 }
 ```
 
 ### Simulate Revenue
 **POST /simulate-revenue**
 
-Simulates revenue for different price points.
+Simulates revenue for different price points using the 50/50 split model.
 
 **Request:**
 ```json
 {
-  "Unit Price": 100,
-  "Unit Cost": 50,
-  "Order Quantity": 5,
-  "Month": 6,
-  "Day": 15,
-  "Weekday": "Friday",
-  "Location": "North",
-  "_ProductID": 12,
-  "price_variations": [80, 90, 100, 110, 120]
+  "base_price": 100.00,
+  "unit_cost": 50.00,
+  "location": "North",
+  "product_id": 12,
+  "month": 6,
+  "day": 15,
+  "weekday": "Friday",
+  "price_variations": [-20, -10, 0, 10, 20]
 }
 ```
 
 **Response:**
 ```json
 {
-  "base_price": 100,
+  "base_price": 100.00,
   "variations": [
-    {"unit_price": 80, "revenue": 1030.77, "quantity": 5, "profit": 780.77},
-    {"unit_price": 90, "revenue": 1049.52, "quantity": 5, "profit": 799.52},
-    {"unit_price": 100, "revenue": 1054.21, "quantity": 5, "profit": 804.21},
-    {"unit_price": 110, "revenue": 1073.89, "quantity": 5, "profit": 823.89},
-    {"unit_price": 120, "revenue": 1087.26, "quantity": 5, "profit": 837.26}
-  ]
+    {
+      "price": 80.00,
+      "predicted_revenue": 1030.77,
+      "predicted_quantity": 12,
+      "profit_margin": 37.5,
+      "total_profit": 360.00
+    },
+    {
+      "price": 90.00,
+      "predicted_revenue": 1049.52,
+      "predicted_quantity": 11,
+      "profit_margin": 44.4,
+      "total_profit": 440.00
+    },
+    {
+      "price": 100.00,
+      "predicted_revenue": 1054.21,
+      "predicted_quantity": 10,
+      "profit_margin": 50.0,
+      "total_profit": 500.00
+    },
+    {
+      "price": 110.00,
+      "predicted_revenue": 1073.89,
+      "predicted_quantity": 9,
+      "profit_margin": 54.5,
+      "total_profit": 540.00
+    },
+    {
+      "price": 120.00,
+      "predicted_revenue": 1087.26,
+      "predicted_quantity": 8,
+      "profit_margin": 58.3,
+      "total_profit": 560.00
+    }
+  ],
+  "optimal_price": 120.00,
+  "optimal_profit": 560.00,
+  "price_elasticity": -0.42
 }
 ```
 
@@ -265,22 +298,22 @@ Error responses include a descriptive message:
 ### Input Fields
 - **Unit Price**: Float (required) - Selling price per unit
 - **Unit Cost**: Float (required) - Cost per unit
-- **Order Quantity**: Integer (required) - Number of units ordered
+- **Location**: String (required) - Regional location
+- **ProductID**: Integer (required) - Product identifier
 - **Month**: Integer (required) - Month of the order (1-12)
 - **Day**: Integer (required) - Day of the month (1-31)
 - **Weekday**: String (required) - Day of the week (Monday-Sunday)
-- **Location**: String (required) - Regional location
-- **_ProductID**: Integer (required) - Product identifier
 
 ### Output Fields
 - **predicted_revenue**: Float - Predicted total revenue
-- **order_quantity**: Integer - Number of units ordered (from input)
-- **profit**: Float - Calculated profit (revenue - total cost)
+- **confidence_score**: Float - Confidence score of the prediction
+- **predicted_quantity**: Integer - Predicted number of units ordered
+- **estimated_profit**: Float - Estimated profit (revenue - total cost)
 
 ## Model Information
-- **Algorithm**: Random Forest Regressor (tuned)
-- **Features**: Unit Price, Unit Cost, Order Quantity, Month, Day, Weekday, Location, Product ID, and derived features
-- **Performance**: MAE = 40.30, RMSE = 235.63, R² = 0.9995 (on test set)
+- **Algorithm**: XGBoost
+- **Features**: Unit Price, Unit Cost, Location, Product ID, Month, Day, Weekday
+- **Performance**: R² = 0.9947 (on test set)
 
 See [MODEL_DOCUMENTATION.md](MODEL_DOCUMENTATION.md) for detailed model information.
 

@@ -283,11 +283,11 @@ def get_dashboard_data():
                     axis=1
                 )
             
-            # Get top 5 products by profit
-            top_products = product_profit.sort_values('Profit', ascending=False).head(5)
+            # Get top 10 products by profit (fetch more to ensure we have enough non-overlapping products)
+            top_products = product_profit.sort_values('Profit', ascending=False).head(10)
             
-            # Get bottom 5 products by profit - separate query to ensure different products
-            bottom_products = product_profit.sort_values('Profit', ascending=True).head(5)
+            # Get bottom 10 products by profit - separate query to ensure different products
+            bottom_products = product_profit.sort_values('Profit', ascending=True).head(10)
             
             # Log product counts for debugging
             print(f"Total unique products: {len(product_profit)}")
@@ -303,16 +303,21 @@ def get_dashboard_data():
             print(f"Bottom product IDs: {bottom_product_ids}")
             print(f"Overlap in IDs: {top_product_ids.intersection(bottom_product_ids)}")
             
-            # Only include a product in both lists if there are enough unique products
-            allow_overlap = len(product_profit) <= 5
+            # Instead of limiting to just a few products, rank ALL products
+            # Sort the entire product_profit dataframe by profit
+            all_products_sorted = product_profit.sort_values('Profit', ascending=False)
             
-            # Convert top products to list of dicts
-            for _, row in top_products.iterrows():
+            # Use the full sorted data to create the products data
+            all_products_data = []
+            for i, (idx, row) in enumerate(all_products_sorted.iterrows()):
                 product_id = int(row['_ProductID'])
                 profit_value = float(row['Profit'])
                 margin_value = float(row['Margin']) if 'Margin' in row else 0
                 
-                top_products_data.append({
+                # Determine rank based on position: top 10 are 'top', bottom 5 are 'bottom'
+                rank = 'top' if i < 10 else ('bottom' if i >= len(all_products_sorted) - 5 else 'middle')
+                
+                all_products_data.append({
                     'id': product_id,
                     'name': f"Product {product_id}",
                     'product': f"Product {product_id}",  # For backward compatibility
@@ -320,37 +325,14 @@ def get_dashboard_data():
                     'quantity': int(row['Quantity']),
                     'revenue': float(row['Total Revenue']) if 'Total Revenue' in row else 0,
                     'margin': round(margin_value * 100, 2),  # Convert to percentage
-                    'rank': 'top'
+                    'rank': rank
                 })
             
-            # Add bottom products, avoiding duplicates unless we have too few products
-            for _, row in bottom_products.iterrows():
-                product_id = int(row['_ProductID'])
-                
-                # Skip if this product is already in the top list and we have enough products
-                if product_id in top_product_ids and not allow_overlap:
-                    continue
-                    
-                profit_value = float(row['Profit'])
-                margin_value = float(row['Margin']) if 'Margin' in row else 0
-                
-                bottom_products_data.append({
-                    'id': product_id,
-                    'name': f"Product {product_id}",
-                    'product': f"Product {product_id}",  # For backward compatibility
-                    'profit': round(profit_value, 2),
-                    'quantity': int(row['Quantity']),
-                    'revenue': float(row['Total Revenue']) if 'Total Revenue' in row else 0,
-                    'margin': round(margin_value * 100, 2),  # Convert to percentage
-                    'rank': 'bottom'
-                })
+            # Use our complete products list
+            top_products_data = all_products_data
             
-            # Log counts for verification
-            print(f"Final top products count: {len(top_products_data)}")
-            print(f"Final bottom products count: {len(bottom_products_data)}")
-            
-            # Combine data, ensure no duplicates
-            top_products_data.extend([p for p in bottom_products_data if p['id'] not in [tp['id'] for tp in top_products_data]])
+            # Log the count of products we're sending
+            print(f"Sending {len(top_products_data)} products to frontend")
             
         else:
             # Sample data if no required columns - use more realistic values

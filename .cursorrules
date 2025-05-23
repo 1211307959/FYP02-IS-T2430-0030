@@ -217,6 +217,32 @@
 #    - Successfully pushed clean repository to GitHub without the large model files
 #    - Maintained all model files in local workspace while keeping them out of Git tracking
 #    - Updated documentation on model file management
+#
+# 27. Dashboard Data Consistency Fix (Latest)
+#    - Fixed data inconsistency where Product 30 appeared in both "lowest profit" and "Top 5 Profitable Products"
+#    - Updated backend API to prevent product overlap between top and bottom rankings
+#    - Modified the generateProfitInsights function to properly handle product rankings
+#    - Improved product filtering logic to ensure consistent insights
+#    - Created NextJS API endpoints (app/api/dashboard/route.ts and app/api/dashboard-data/route.ts) for dashboard data
+#    - Added robust data consistency checks to prevent future issues
+#    - Created dedicated test script (test_dashboard_consistency.py) to validate fixes
+#    - Ensured proper separation of top and bottom ranked products
+#    - Added data validation and logging for debugging potential inconsistencies
+#    - Fixed overlapping IDs between product rankings to ensure data integrity
+#    - Fixed frontend API issues with URL parsing and cache handling
+#    - Added comprehensive testing to verify both backend and frontend data consistency
+#
+# 28. Dashboard UI Improvements (Latest)
+#    - Fixed graph appearance issues by adjusting bar sizes from 15px to 30px for better visibility
+#    - Added toggling between highest and lowest profit products to replace the separate profit improvement section
+#    - Implemented a button to switch between viewing top profitable products and lowest profit products
+#    - Used different color coding for highest profit (green) and lowest profit (orange) products
+#    - Added proper TypeScript interfaces for product data to ensure type safety
+#    - Enhanced dynamic rendering based on the selected view (top vs lowest profit)
+#    - Fixed overlap issues between product rankings by ensuring proper filtering
+#    - Made charts more consistent with responsive sizing and color schemes
+#    - Improved general UI appearance with better spacing and layout
+#    - Added proper type definitions to fix TypeScript errors in data mapping
 
 # Files created in this project (current):
 # - train_model_50_50_split.py: Script to train model with 50/50 split
@@ -238,8 +264,11 @@
 # - app/api/products/route.ts: Next.js API route for product data (updated for dynamic loading)
 # - app/api/product-data/route.ts: Next.js API route for detailed product price/cost data from CSV
 # - app/api/simulate/route.ts: Next.js API route for scenario simulation (updated for field variations)
+# - app/api/dashboard/route.ts: Next.js API route that redirects to dashboard-data
+# - app/api/dashboard-data/route.ts: Next.js API route for dashboard data with consistency validation
 # - app/api/predict/route.ts: Next.js API route for revenue prediction
 # - app/api/health/route.ts: Next.js API route for health checking
+# - test_dashboard_consistency.py: Test script to validate dashboard data consistency
 # - .cursorrules: This file, tracking the conversation
 
 # Project features:
@@ -262,6 +291,10 @@
 # - Edge case handling for application robustness
 # - Accurate product cost values in UI matching the actual dataset
 # - Dynamic loading of product data directly from CSV files
+# - Data consistency validation for dashboard metrics and insights
+# - Automated testing of data integrity between frontend and backend
+# - Robust API error handling and cache control for fresh data
+# - Improved dashboard UI with better visualization and toggles between profit rankings
 
 # Dependencies:
 # - Python: pandas, numpy, scikit-learn, lightgbm, joblib, matplotlib, flask, flask-cors
@@ -281,41 +314,12 @@
 # - Price_Popularity (6.31%)
 
 # Latest Updates:
-# - Fixed Git push error due to large model files (>100MB) exceeding GitHub's file size limit
-# - Added all *.pkl files to .gitignore to prevent accidental commits
-# - Created clean repository history without large files by creating a new orphan branch
-# - Successfully pushed clean repository to GitHub without the large model files
-# - Maintained all model files in local workspace while keeping them out of Git tracking
-# - Updated documentation on model file management
-# - Added validation for extreme price values in revenue_predictor_50_50.py
-# - Improved error handling in API endpoints to prevent 500 errors
-# - Fixed field name inconsistencies between frontend and backend
-# - Added fallback simulation data for edge cases
-# - Enhanced debugging with better error logging
-# - Fixed scenario planner to handle special cases like very high prices
-# - Added proper signal handling with timeouts for API requests
-# - Fixed issues with field naming consistency in API responses
-# - Improved error message display in the scenario planner UI
-# - Fixed scenario simulation issue in the API integration
-# - Updated revenue_predictor_50_50.py to include both 'predicted_revenue' and 'revenue' fields
-# - Modified Next.js API route to handle field name variations
-# - Fixed product cost values in the frontend to match the actual dataset
-# - Updated all 47 product costs in the productAverages object
-# - Resolved price simulation and display issues in the scenario planner UI
-# - Created API endpoint (app/api/product-data/route.ts) to read product data directly from CSV
-# - Updated app/api/products/route.ts to extract product IDs from the data file
-# - Added "Reload Product Data" button for real-time data refreshing
-# - Switched from PROD### format to numeric product IDs to match data file format
-# - Ensured consistent handling of product IDs between frontend and backend
-# - Implemented averaging logic to compute accurate product prices and costs
-# - Fixed issue with simulate endpoint failing by correcting the API URL to use /simulate-revenue
-# - Created a dedicated app/api/simulate-revenue/route.ts endpoint to proxy requests to Flask backend
-# - Updated request formatting in lib/api.ts to properly handle weekday names
-# - Modified product-data and products API routes to work with any CSV file in the data directory
-# - Fixed data type conversions to ensure consistent data is sent to the backend
-# - Added proper error handling in the simulate API endpoint
-# - Ensured the product IDs are properly parsed as integers for the backend API
-# - Added realistic price elasticity modeling for extreme price values
-# - Fixed issue where high prices still showed unrealistic revenue predictions
-# - Ensured zero quantity results in zero revenue for consistency
-# - Implemented proper economic pricing curves based on elasticity principles
+# - Fixed graph appearance issues by adjusting bar sizes from 15px to 30px for better visibility
+# - Added toggling between highest and lowest profit products to replace the separate profit improvement section
+# - Implemented a button to switch between viewing top profitable products and lowest profit products
+# - Used different color coding for highest profit (green) and lowest profit (orange) products
+# - Added proper TypeScript interfaces for product data to ensure type safety
+# - Enhanced dynamic rendering based on the selected view (top vs lowest profit)
+# - Fixed overlap issues between product rankings by ensuring proper filtering
+# - Made charts more consistent with responsive sizing and color schemes
+# - Improved general UI appearance with better spacing and layout

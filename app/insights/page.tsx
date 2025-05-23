@@ -18,6 +18,8 @@ import {
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { getDashboardData } from "@/lib/api"
 
+export const dynamic = 'force-dynamic'; // Force dynamic rendering to prevent stale data
+
 // Enhanced insight generation functions
 function generateProfitInsights(productData: any[]) {
   if (!productData || productData.length === 0) return []
@@ -30,13 +32,38 @@ function generateProfitInsights(productData: any[]) {
   
   const insights = [];
   
-  // Find top profit product using rank field or by sorting
-  const topProduct = productData.find(p => p.rank === 'top') || 
-                    [...productData]
-                      .filter(p => p && p.profit !== undefined && p.name)
-                      .sort((a, b) => b.profit - a.profit)[0];
+  // Ensure no overlap between top and bottom products
+  // First, separate products by their rank
+  const topRanked = productData.filter(p => p.rank === 'top' || !p.rank);
+  const bottomRanked = productData.filter(p => p.rank === 'bottom');
   
-  if (topProduct) {
+  // Sort by profit (highest to lowest for top, lowest to highest for bottom)
+  const topProducts = [...topRanked].sort((a, b) => b.profit - a.profit);
+  const bottomProducts = [...bottomRanked].sort((a, b) => a.profit - b.profit);
+  
+  // Log for debugging
+  console.log("Top product candidates:", topProducts.slice(0, 5).map(p => `${p.name} (ID: ${p.id}): $${p.profit}`).join(', '));
+  console.log("Bottom product candidates:", bottomProducts.slice(0, 5).map(p => `${p.name} (ID: ${p.id}): $${p.profit}`).join(', '));
+  
+  // Check for product ID overlaps between top and bottom lists
+  const topProductIds = new Set(topProducts.slice(0, 5).map(p => p.id));
+  const bottomProductIds = new Set(bottomProducts.slice(0, 5).map(p => p.id));
+  
+  // Find any overlapping IDs
+  const overlappingIds = Array.from(topProductIds).filter(id => bottomProductIds.has(id));
+  console.log("Overlapping product IDs:", overlappingIds);
+  
+  // If we have overlaps, remove them from the bottom list
+  if (overlappingIds.length > 0) {
+    console.log("Removing overlapping products from bottom candidates");
+    const filteredBottomProducts = bottomProducts.filter(p => !topProductIds.has(p.id));
+    // Replace the bottom products list with the filtered one
+    bottomProducts.splice(0, bottomProducts.length, ...filteredBottomProducts);
+  }
+  
+  // Get true top product from sorted list
+  if (topProducts.length > 0) {
+    const topProduct = topProducts[0];
     insights.push({
       title: "Top Profit Generator",
       description: `${topProduct.name} is your highest profit generator with $${topProduct.profit.toLocaleString()} in profits.`,
@@ -45,31 +72,19 @@ function generateProfitInsights(productData: any[]) {
     });
   }
   
-  // Find bottom profit product using rank field or by sorting
-  const bottomProduct = productData.find(p => p.rank === 'bottom');
-  
-  // Only add lowest profit insight if we found a bottom-ranked product and it's different from the top
-  if (bottomProduct && (!topProduct || bottomProduct.id !== topProduct.id)) {
-    insights.push({
-      title: "Profit Improvement Opportunity",
-      description: `${bottomProduct.name} has the lowest profit. Consider adjusting pricing or costs.`,
-      icon: <TrendingDown className="h-5 w-5 text-amber-500" />,
-      type: "warning"
-    });
-  } else {
-    // If no bottom product found or it's the same as top, try finding the product with lowest profit
-    const sortedByProfit = [...productData]
-      .filter(p => p && p.profit !== undefined && p.name)
-      .sort((a, b) => a.profit - b.profit);
-    
-    if (sortedByProfit.length > 1 && sortedByProfit[0].id !== topProduct?.id) {
-      const lowestProfit = sortedByProfit[0];
+  // Only add insight for bottom product if the array has any left after deduplication
+  if (bottomProducts.length > 0) {
+    const lowestProfit = bottomProducts[0];
+    // Double check it's not in the top products
+    if (!topProductIds.has(lowestProfit.id)) {
       insights.push({
         title: "Profit Improvement Opportunity",
         description: `${lowestProfit.name} has the lowest profit. Consider adjusting pricing or costs.`,
         icon: <TrendingDown className="h-5 w-5 text-amber-500" />,
         type: "warning"
       });
+    } else {
+      console.warn(`Skipping bottom product insight for ${lowestProfit.name} as it appears in top products (should not happen after deduplication)`);
     }
   }
   
