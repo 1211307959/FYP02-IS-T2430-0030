@@ -64,26 +64,22 @@ export async function getDataFiles() {
 }
 
 /**
- * Select a data file to use
+ * This function is deprecated as the system now uses all data files combined
+ * Kept for backward compatibility but will trigger a reload of combined data
  */
 export async function selectDataFile(filename: string) {
   try {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/select-data-file`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ filename }),
-    });
+    // Instead of selecting a specific file, we'll just reload all files
+    const result = await reloadDataFiles();
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to select data file');
-    }
+    // Dispatch a global event to notify components that the data has changed
+    window.dispatchEvent(new CustomEvent('dataFileChanged', { 
+      detail: { message: 'Using combined data from all files', timestamp: new Date().toISOString() } 
+    }));
     
-    return await response.json();
+    return result;
   } catch (error) {
-    console.error('Error selecting data file:', error);
+    console.error('Error reloading data files:', error);
     throw error;
   }
 }

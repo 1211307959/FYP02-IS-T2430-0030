@@ -148,6 +148,24 @@ export default function ScenarioPlannerPage() {
     }
     
     fetchOptions()
+    
+    // Listen for data file changes from other parts of the app
+    const handleDataFileChanged = (event: Event) => {
+      console.log("Data file changed event received in scenario planner");
+      // Reload product data when file changes
+      fetchOptions();
+      // Reset simulation state
+      setIsSimulated(false);
+      setScenarioResults([]);
+    };
+    
+    // Add event listener for data file changes
+    window.addEventListener('dataFileChanged', handleDataFileChanged);
+    
+    // Clean up event listener when component unmounts
+    return () => {
+      window.removeEventListener('dataFileChanged', handleDataFileChanged);
+    };
   }, [])
 
   // Handle input changes

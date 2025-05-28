@@ -10,8 +10,9 @@ A web-based decision support system that leverages machine learning to provide s
 - Interactive scenario planning
 - Automated insights generation
 - Visual dashboard with key metrics
-- CSV/Excel data integration
+- Multi-file data integration (combines all CSV files automatically)
 - Price optimization recommendations
+- Combined data processing from multiple sources
 
 **Target Users**: Small business owners, retail managers, e-commerce operators
 
@@ -24,6 +25,7 @@ graph TD
     D --> E[Training Data]
     C --> F[CSV Storage]
     F --> G[Historical Sales Data]
+    H[Multiple CSV Files] --> C
 ```
 
 ## Tech Stack
@@ -70,20 +72,23 @@ start-idss.bat
 ```
 
 ## Usage
-1. **Data Upload**:
-   - Navigate to `/data-input`
-   - Upload CSV/Excel file with historical sales data
+1. **Data Management**:
+   - Navigate to `/settings` > Datasets tab
+   - Upload CSV/Excel files with historical sales data
+   - System automatically combines all data files for analysis
    - Required columns: Date, ProductID, UnitPrice, Quantity, Location
 
 2. **Dashboard**:
    - View key metrics: Sales Trends, Product Performance
    - Interactive filters by date range/product category
    - Download summary reports (PDF/CSV)
+   - Data from all files is automatically combined
 
 3. **Scenario Planning**:
    - Simulate price changes
    - Forecast demand under different conditions
    - Optimize inventory levels
+   - All predictions use the combined dataset from all files
 
 ## ML Model Details
 **Core Model**: XGBoost 50/50 Split Predictor
@@ -98,6 +103,10 @@ start-idss.bat
   - <1ms prediction latency
   - 99.4% accuracy on revenue forecasting
   - Robust price elasticity modeling
+- Multi-file capability:
+  - Automatically processes all data files
+  - Identifies and uses common columns across files
+  - Maintains data source tracking for advanced analysis
 
 ## System Features
 | Feature | Description |
@@ -108,6 +117,7 @@ start-idss.bat
 | Demand Prediction | Expected units sold by product category |
 | Visual Analytics | Interactive charts and heatmaps |
 | Report Generation | Exportable PDF/CSV reports |
+| Multi-file Processing | Combines all data files automatically |
 
 ## Screenshots
 1. [Dashboard View](/actual_vs_predicted_50_50_split.png)

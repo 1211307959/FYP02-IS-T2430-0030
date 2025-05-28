@@ -16,6 +16,7 @@ import { ModeToggle } from "@/components/mode-toggle"
 import { useToast } from "@/components/ui/use-toast"
 import { Save, Trash2, Upload, RefreshCw } from "lucide-react"
 import { getDataFiles, selectDataFile, reloadDataFiles, uploadFile } from "@/lib/api"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function SettingsPage() {
   const { toast } = useToast()
@@ -108,21 +109,27 @@ export default function SettingsPage() {
     }))
   }
 
-  // Handle selecting a dataset
-  const handleSelectDataset = async (datasetName: string) => {
-    if (datasetName === currentFile) return
-
+  // Handle selecting a dataset - now just reloads all data
+  const handleReloadAllData = async () => {
     setIsLoading(true)
     try {
-      // Simplified to just show a message
+      // Call the API to reload all data files
+      const result = await reloadDataFiles()
+      
       toast({
-        title: "Using default dataset",
-        description: "Currently using the default dataset file for predictions and analytics.",
+        title: "Using combined data",
+        description: `Now using combined data from all CSV files (${result.files?.length || 0} files).`,
       })
+      
+      // Force a refresh of all components
+      window.dispatchEvent(new CustomEvent('dataFileChanged', { 
+        detail: { message: 'Using combined data from all files', timestamp: new Date().toISOString() } 
+      }));
     } catch (error) {
+      console.error("Error reloading data:", error)
       toast({
-        title: "Error selecting dataset",
-        description: "Could not select the dataset. Please try again.",
+        title: "Error reloading data",
+        description: "Could not reload the dataset files. Please try again.",
         variant: "destructive"
       })
     } finally {
@@ -490,59 +497,59 @@ export default function SettingsPage() {
               ) : datasets.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">No datasets found. Upload a CSV file to get started.</div>
               ) : (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Dataset Name</TableHead>
-                        <TableHead>Upload Date</TableHead>
-                        <TableHead>Size</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {datasets.map((dataset) => (
-                        <TableRow key={dataset.id} className={dataset.status === "Active" ? "bg-muted/50" : undefined}>
-                          <TableCell className="font-medium">
-                            <Button 
-                              variant="link" 
-                              className="p-0 h-auto font-medium" 
-                              onClick={() => handleSelectDataset(dataset.name)}
-                              disabled={dataset.status === "Active" || isLoading}
-                            >
-                              {dataset.name}
-                            </Button>
-                          </TableCell>
-                          <TableCell>{dataset.date}</TableCell>
-                          <TableCell>{dataset.size}</TableCell>
-                          <TableCell>
-                            {dataset.status === "Active" ? (
-                            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-300">
-                              {dataset.status}
-                            </span>
-                            ) : (
-                              <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                                {dataset.status}
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => handleDeleteClick(dataset.id)}
-                              disabled={dataset.status === "Active" || isLoading}
-                            >
-                              <Trash2 className="h-4 w-4 text-muted-foreground" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
-                          </TableCell>
+                <>
+                  <Alert className="mb-4">
+                    <AlertDescription>
+                      All CSV files in the data folder are now used simultaneously. The system automatically combines data from all files.
+                    </AlertDescription>
+                  </Alert>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Dataset Name</TableHead>
+                          <TableHead>Upload Date</TableHead>
+                          <TableHead>Size</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {datasets.map((dataset) => (
+                          <TableRow key={dataset.id}>
+                            <TableCell className="font-medium">
+                              {dataset.name}
+                            </TableCell>
+                            <TableCell>{dataset.date}</TableCell>
+                            <TableCell>{dataset.size}</TableCell>
+                            <TableCell>
+                              <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-300">
+                                Active
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleDeleteClick(dataset.id)}
+                                disabled={isLoading}
+                              >
+                                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                <span className="sr-only">Delete</span>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <Button onClick={handleReloadAllData} disabled={isLoading}>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Reload All Data
+                    </Button>
+                  </div>
+                </>
               )}
 
               <div className="space-y-2 mt-4">

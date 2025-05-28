@@ -7,16 +7,25 @@ from revenue_predictor_50_50 import predict_revenue, simulate_price_variations, 
 from flask_cors import CORS
 import joblib
 import glob
-from datetime import datetime
+from datetime import datetime, timedelta
 import werkzeug
 import shutil
+import traceback
+import random
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-# Global variables to track data files
-DATA_DIR = "."  # Default to current directory
-CURRENT_DATA_FILE = "trainingdataset.csv"  # Default data file
+# Set data directory and model paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+MODEL_PATH = os.path.join(BASE_DIR, 'revenue_model_50_50_split.pkl')
+ENCODERS_PATH = os.path.join(BASE_DIR, 'revenue_encoders_50_50_split.pkl')
+
+# Initialize global variables
+# Instead of tracking a single current data file, we'll track all files
+ALL_DATA_FILES = []
+COMBINED_DATA = None
 
 def validate_api_input(data):
     """Validate API input data"""
@@ -38,17 +47,21 @@ def validate_api_input(data):
 @app.route('/data-files', methods=['GET'])
 def get_data_files():
     """Get a list of available data files"""
+    global ALL_DATA_FILES
+    
     try:
         # Find all CSV files in the data directory
         csv_files = glob.glob(os.path.join(DATA_DIR, "*.csv"))
         
         # Extract just the filenames
         filenames = [os.path.basename(file) for file in csv_files]
+        ALL_DATA_FILES = filenames
         
         return jsonify({
             'status': 'success',
             'files': filenames,
-            'current_file': CURRENT_DATA_FILE
+            'current_mode': 'combined',
+            'message': f"Using combined data from {len(filenames)} files"
         })
     except Exception as e:
         print(f"Error getting data files: {str(e)}")
@@ -57,57 +70,89 @@ def get_data_files():
             'error': f"Failed to get data files: {str(e)}"
         }), 500
 
-# Select a data file to use
-@app.route('/select-data-file', methods=['POST'])
-def select_data_file():
-    """Select a data file to use"""
-    global CURRENT_DATA_FILE
+# Load combined data from all CSV files
+def load_combined_data():
+    """Load and combine data from all CSV files in the data directory"""
+    global COMBINED_DATA, ALL_DATA_FILES
     
     try:
-        # Get filename from request
-        data = request.get_json()
-        filename = data.get('filename')
+        # Find all CSV files in the data directory
+        csv_files = glob.glob(os.path.join(DATA_DIR, "*.csv"))
         
-        if not filename:
-            return jsonify({
-                'status': 'error',
-                'error': 'Missing filename parameter'
-            }), 400
+        # Extract just the filenames for tracking
+        ALL_DATA_FILES = [os.path.basename(file) for file in csv_files]
         
-        # Check if file exists
-        file_path = os.path.join(DATA_DIR, filename)
-        if not os.path.exists(file_path):
-            return jsonify({
-                'status': 'error',
-                'error': f"File not found: {filename}"
-            }), 404
+        if not csv_files:
+            print("No CSV files found in data directory")
+            COMBINED_DATA = pd.DataFrame()
+            return False
         
-        # Set current data file
-        CURRENT_DATA_FILE = filename
+        # Load and combine all CSV files
+        dataframes = []
+        for file_path in csv_files:
+            try:
+                df = pd.read_csv(file_path)
+                # Add source file column for tracking
+                df['_source_file'] = os.path.basename(file_path)
+                dataframes.append(df)
+                print(f"Loaded {file_path} with {len(df)} rows")
+            except Exception as e:
+                print(f"Error loading {file_path}: {str(e)}")
+                continue
         
-        return jsonify({
-            'status': 'success',
-            'message': f"Selected data file: {filename}"
-        })
+        if not dataframes:
+            print("No valid data loaded from CSV files")
+            COMBINED_DATA = pd.DataFrame()
+            return False
+        
+        # Combine all dataframes
+        # First, get common columns to ensure compatibility
+        if len(dataframes) > 1:
+            # Find common columns across all dataframes
+            common_columns = set(dataframes[0].columns)
+            for df in dataframes[1:]:
+                common_columns &= set(df.columns)
+            
+            # If needed, subset dataframes to common columns
+            if len(common_columns) < len(dataframes[0].columns):
+                print(f"Using {len(common_columns)} common columns across all files")
+                for i in range(len(dataframes)):
+                    dataframes[i] = dataframes[i][list(common_columns)]
+            
+            # Add the source file column back if it was removed
+            if '_source_file' not in common_columns:
+                for i in range(len(dataframes)):
+                    dataframes[i]['_source_file'] = os.path.basename(csv_files[i])
+        
+        # Combine all dataframes
+        COMBINED_DATA = pd.concat(dataframes, ignore_index=True)
+        print(f"Combined data has {len(COMBINED_DATA)} rows and {len(COMBINED_DATA.columns)} columns")
+        return True
     except Exception as e:
-        print(f"Error selecting data file: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'error': f"Failed to select data file: {str(e)}"
-        }), 500
+        print(f"Error loading combined data: {str(e)}")
+        COMBINED_DATA = pd.DataFrame()
+        return False
 
 # Reload data files
 @app.route('/reload', methods=['GET'])
 def reload_data_files():
     """Reload data files from the data directory"""
     try:
-        # Nothing to do here since we just scan for files when requested
-        # This would be more meaningful if we had a file cache
+        # Reload combined data
+        success = load_combined_data()
         
-        return jsonify({
-            'status': 'success',
-            'message': 'Data files reloaded'
-        })
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': f'Combined data loaded from {len(ALL_DATA_FILES)} files with {len(COMBINED_DATA)} total rows',
+                'files': ALL_DATA_FILES
+            })
+        else:
+            return jsonify({
+                'status': 'warning',
+                'message': 'No valid data files found or error loading data',
+                'files': ALL_DATA_FILES
+            })
     except Exception as e:
         print(f"Error reloading data files: {str(e)}")
         return jsonify({
@@ -118,18 +163,21 @@ def reload_data_files():
 # Dashboard data
 @app.route('/dashboard-data', methods=['GET'])
 def get_dashboard_data():
-    """Get dashboard data from the current data file"""
+    """Get dashboard data from all data files combined"""
+    global COMBINED_DATA
+    
     try:
-        # Load the current data file
-        file_path = os.path.join(DATA_DIR, CURRENT_DATA_FILE)
-        if not os.path.exists(file_path):
-            return jsonify({
-                'status': 'error',
-                'error': f"Current data file not found: {CURRENT_DATA_FILE}"
-            }), 404
+        # If combined data not loaded yet, load it
+        if COMBINED_DATA is None or COMBINED_DATA.empty:
+            success = load_combined_data()
+            if not success:
+                return jsonify({
+                    'status': 'error',
+                    'error': 'No valid data available'
+                }), 404
         
-        # Load the data
-        df = pd.read_csv(file_path)
+        # Use the combined dataframe
+        df = COMBINED_DATA
         
         # Perform initial validation of required columns
         required_columns = ['_ProductID', 'Unit Price', 'Unit Cost', 'Total Revenue']
@@ -233,16 +281,16 @@ def get_dashboard_data():
                     'revenue': round(5000 + i * 2000 + np.random.randint(1000), 2)
                 })
         
-        # Revenue by customer (location)
-        customer_revenue_data = []
+        # Revenue by location (previously customer)
+        location_data = []
         location_col = 'Location' if 'Location' in df.columns else 'CustomerID'
         if location_col in df.columns and 'Total Revenue' in df.columns:
             # Group by location and calculate total revenue
-            customer_revenue = df.groupby(location_col)['Total Revenue'].sum().reset_index()
+            location_revenue = df.groupby(location_col)['Total Revenue'].sum().reset_index()
             
             # Convert to list of dicts for the chart
-            for _, row in customer_revenue.iterrows():
-                customer_revenue_data.append({
+            for _, row in location_revenue.iterrows():
+                location_data.append({
                     'name': str(row[location_col]),
                     'revenue': round(float(row['Total Revenue']), 2)
                 })
@@ -250,7 +298,7 @@ def get_dashboard_data():
             # Sample data if no required columns
             locations = ['North', 'South', 'East', 'West', 'Central']
             for location in locations:
-                customer_revenue_data.append({
+                location_data.append({
                     'name': location,
                     'revenue': round(7000 + np.random.randint(5000), 2)
                 })
@@ -365,13 +413,16 @@ def get_dashboard_data():
             })
         product_revenue_data = product_revenue_data_fixed
         
+        # Update the variable name if it exists
+        if 'customer_data' in locals():
+            location_data = customer_data
+        
         # Return the dashboard data
         return jsonify({
             'status': 'success',
             'revenue_data': revenue_data,
             'product_revenue_data': product_revenue_data,
-            'customer_revenue_data': customer_revenue_data,
-            'location_revenue_data': customer_revenue_data,  # Add this for compatibility
+            'location_revenue_data': location_data,  # Changed from customer_revenue_data
             'top_products_data': top_products_data,
             'total_revenue': round(total_revenue, 2),
             'total_sales': total_sales,
@@ -379,7 +430,6 @@ def get_dashboard_data():
         })
     except Exception as e:
         print(f"Error getting dashboard data: {str(e)}")
-        import traceback
         traceback.print_exc()  # Print full stack trace for better debugging
         return jsonify({
             'status': 'error',
@@ -429,7 +479,7 @@ def get_locations():
     """Return all unique locations from the training data."""
     try:
         # Load encoders
-        encoders = joblib.load('revenue_encoders_50_50_split.pkl')
+        encoders = joblib.load(ENCODERS_PATH)
         
         # Get location encoder
         if 'Location' in encoders:
@@ -447,7 +497,7 @@ def get_products():
     """Return all unique products from the training data."""
     try:
         # Load encoders
-        encoders = joblib.load('revenue_encoders_50_50_split.pkl')
+        encoders = joblib.load(ENCODERS_PATH)
         
         # Get product encoder
         if '_ProductID' in encoders:
@@ -722,7 +772,6 @@ def api_simulate_revenue():
             'error': str(e)
         }), 400
     except Exception as e:
-        import traceback
         print(f"Unexpected error in simulate-revenue: {str(e)}")
         traceback.print_exc()
         return jsonify({
@@ -862,12 +911,12 @@ def upload_file():
             'error': f"Failed to upload file: {str(e)}"
         }), 500
 
+# Initialize on startup: load combined data
+load_combined_data()
+
 if __name__ == '__main__':
     # Check if model files exist before starting
-    model_path = 'revenue_model_50_50_split.pkl'
-    encoders_path = 'revenue_encoders_50_50_split.pkl'
-    
-    if not os.path.exists(model_path) or not os.path.exists(encoders_path):
+    if not os.path.exists(MODEL_PATH) or not os.path.exists(ENCODERS_PATH):
         print("Error: Model files not found. Please run train_model_50_50_split.py first.")
         exit(1)
     

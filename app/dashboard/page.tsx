@@ -6,8 +6,8 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { BarChart, LineChart, CartesianGrid, XAxis, YAxis, Legend, Bar, Line, ResponsiveContainer, Tooltip } from "recharts"
-import { ArrowUpRight, DollarSign, ShoppingCart, TrendingUp, AlertCircle, FileText, RefreshCw, ListFilter, X } from "lucide-react"
+import { BarChart, LineChart, CartesianGrid, XAxis, YAxis, Legend, Bar, Line, ResponsiveContainer, Tooltip, Cell } from "recharts"
+import { ArrowUpRight, DollarSign, ShoppingCart, TrendingUp, AlertCircle, FileText, RefreshCw, ListFilter, X, CalendarIcon, Filter } from "lucide-react"
 import { checkApiHealth, getDashboardData, getDataFiles, selectDataFile, reloadDataFiles } from "@/lib/api"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -18,12 +18,20 @@ import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { 
+  Popover,
+  PopoverContent,
+  PopoverTrigger 
+} from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { format } from "date-fns"
+import { Input } from "@/components/ui/input"
 
-// Data File Selector Component
-const DataFileSelector = ({ onFileChange }: { onFileChange: () => void }) => {
+// Data File Indicator Component
+const DataFileIndicator = ({ onReload }: { onReload: () => void }) => {
   const { toast } = useToast()
   const [dataFiles, setDataFiles] = useState<string[]>([])
-  const [currentFile, setCurrentFile] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -35,26 +43,8 @@ const DataFileSelector = ({ onFileChange }: { onFileChange: () => void }) => {
     try {
       const data = await getDataFiles()
       setDataFiles(data.files || [])
-      setCurrentFile(data.current_file || "")
     } catch (err) {
       setError("Failed to load data files")
-    }
-  }
-
-  const handleFileChange = async (filename: string) => {
-    if (filename === currentFile) return
-    
-    setIsLoading(true)
-    setError("")
-    
-    try {
-      await selectDataFile(filename)
-      setCurrentFile(filename)
-      onFileChange()
-    } catch (err) {
-      setError("Failed to change data file")
-    } finally {
-      setIsLoading(false)
     }
   }
   
@@ -67,8 +57,9 @@ const DataFileSelector = ({ onFileChange }: { onFileChange: () => void }) => {
       fetchDataFiles()
       toast({
         title: "Data files reloaded",
-        description: "The list of available data files has been refreshed.",
+        description: `Using combined data from ${dataFiles.length} files.`,
       })
+      onReload()
     } catch (err) {
       setError("Failed to reload data files")
     } finally {
@@ -76,30 +67,15 @@ const DataFileSelector = ({ onFileChange }: { onFileChange: () => void }) => {
     }
   }
 
-  if (dataFiles.length === 0) return null;
-
   return (
     <div className="mb-6 flex items-center space-x-4">
       <div className="flex items-center">
         <FileText className="h-5 w-5 mr-2 text-muted-foreground" />
-        <span className="text-sm font-medium">Data File:</span>
+        <span className="text-sm font-medium">Data source:</span>
       </div>
-      <Select
-        value={currentFile}
-        onValueChange={handleFileChange}
-        disabled={isLoading}
-      >
-        <SelectTrigger className="w-[240px]">
-          <SelectValue placeholder="Select a data file" />
-        </SelectTrigger>
-        <SelectContent>
-          {dataFiles.map((file) => (
-            <SelectItem key={file} value={file}>
-              {file}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Badge variant="outline" className="font-mono">
+        Using combined data from {dataFiles.length} file{dataFiles.length !== 1 ? 's' : ''}
+      </Badge>
       <Button 
         variant="outline" 
         size="icon" 
@@ -134,7 +110,7 @@ export default function DashboardPage() {
   // State for dashboard data
   const [revenueData, setRevenueData] = useState<any[]>([])
   const [productRevenueData, setProductRevenueData] = useState<any[]>([])
-  const [customerRevenueData, setCustomerRevenueData] = useState<any[]>([])
+  const [locationRevenueData, setLocationRevenueData] = useState<any[]>([])
   const [topProductsData, setTopProductsData] = useState<Product[]>([])
   const [allProductsData, setAllProductsData] = useState<Product[]>([])
   const [showAllProductsModal, setShowAllProductsModal] = useState(false)
@@ -142,6 +118,14 @@ export default function DashboardPage() {
   const [totalSales, setTotalSales] = useState(0)
   const [averageRevenuePerSale, setAverageRevenuePerSale] = useState(0)
   const [showProfit, setShowProfit] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [dateRange, setDateRange] = useState<{from: Date | undefined, to: Date | undefined}>({
+    from: undefined,
+    to: undefined
+  })
+  const [productFilter, setProductFilter] = useState("all")
+  const [locationFilter, setLocationFilter] = useState("all")
+  const [filteredRevenueData, setFilteredRevenueData] = useState<any[]>([])
 
   const NUM_TOP_PRODUCTS = 10; // Show top 10 products
   
@@ -159,6 +143,21 @@ export default function DashboardPage() {
     // Fetch dashboard data from the API
     fetchDashboardData();
     checkApi();
+    
+    // Listen for data file changes from other parts of the app
+    const handleDataFileChanged = (event: Event) => {
+      console.log("Data file changed event received");
+      // Force refresh data when file changes
+      handleDataFileChange();
+    };
+    
+    // Add event listener for data file changes
+    window.addEventListener('dataFileChanged', handleDataFileChanged);
+    
+    // Clean up event listener when component unmounts
+    return () => {
+      window.removeEventListener('dataFileChanged', handleDataFileChanged);
+    };
   }, [])
 
   // Handle data file change
@@ -195,6 +194,55 @@ export default function DashboardPage() {
       allProducts: sortedAllProducts
     };
   };
+  
+  // Add a function to apply filters
+  const applyFilters = () => {
+    let filtered = [...revenueData];
+    
+    // Apply date range filter if dates are selected
+    if (dateRange.from && dateRange.to) {
+      const fromDate = new Date(dateRange.from);
+      const toDate = new Date(dateRange.to);
+      
+      filtered = filtered.filter(item => {
+        // Assuming month format is like "Jan 2023"
+        if (!item.month) return true;
+        
+        const parts = item.month.split(' ');
+        if (parts.length !== 2) return true;
+        
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const monthIndex = monthNames.indexOf(parts[0]);
+        if (monthIndex === -1) return true;
+        
+        const year = parseInt(parts[1]);
+        const itemDate = new Date(year, monthIndex, 1);
+        
+        return itemDate >= fromDate && itemDate <= toDate;
+      });
+    }
+    
+    // Apply product filter if specified
+    if (productFilter && productFilter !== "all") {
+      // This would require product-specific revenue data
+      // For now, we'll just log that this filter was applied
+      console.log("Product filter applied:", productFilter);
+    }
+    
+    // Apply location filter if specified
+    if (locationFilter && locationFilter !== "all") {
+      // This would require location-specific revenue data
+      // For now, we'll just log that this filter was applied
+      console.log("Location filter applied:", locationFilter);
+    }
+    
+    setFilteredRevenueData(filtered);
+  };
+  
+  // Call applyFilters whenever filter values change
+  useEffect(() => {
+    applyFilters();
+  }, [revenueData, dateRange, productFilter, locationFilter]);
   
   const fetchDashboardData = async () => {
     setIsLoading(true);
@@ -234,8 +282,15 @@ export default function DashboardPage() {
       })) || [];
       
       setRevenueData(enhancedRevenueData);
+      setFilteredRevenueData(enhancedRevenueData); // Initialize filtered data
       setProductRevenueData(data.product_revenue_data || []);
-      setCustomerRevenueData(data.customer_revenue_data || []);
+      
+      // Update to use location_revenue_data instead of customer_revenue_data
+      setLocationRevenueData(data.location_revenue_data || []);
+      
+      // Log the location data for debugging
+      console.log("Location data:", data.location_revenue_data);
+      
       setTotalPredictedRevenue(data.total_revenue || 0);
       setTotalSales(data.total_sales || 0);
       setAverageRevenuePerSale(data.avg_revenue_per_sale || 0);
@@ -262,7 +317,7 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      <DataFileSelector onFileChange={handleDataFileChange} />
+      <DataFileIndicator onReload={handleDataFileChange} />
       
       {error && (
         <Alert variant="destructive" className="mb-6">
@@ -332,7 +387,7 @@ export default function DashboardPage() {
         <TabsList>
           <TabsTrigger value="revenue">Revenue Over Time</TabsTrigger>
           <TabsTrigger value="products">Revenue by Product</TabsTrigger>
-          <TabsTrigger value="customers">Revenue by Location</TabsTrigger>
+          <TabsTrigger value="locations">Revenue by Location</TabsTrigger>
           <TabsTrigger value="profitable">Profitable Products</TabsTrigger>
         </TabsList>
 
@@ -345,6 +400,15 @@ export default function DashboardPage() {
                   <CardDescription>Monthly revenue trends for the current year</CardDescription>
                 </div>
                 <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="flex items-center gap-1"
+                  >
+                    <Filter className="h-4 w-4" />
+                    {showFilters ? "Hide Filters" : "Show Filters"}
+                  </Button>
                   <Switch 
                     id="show-profit" 
                     checked={showProfit}
@@ -354,6 +418,135 @@ export default function DashboardPage() {
                   <Label htmlFor="show-profit">Show Profit</Label>
                 </div>
               </div>
+              
+              {showFilters && (
+                <div className="mt-4 p-4 border rounded-md bg-muted/20">
+                  <div className="text-sm font-medium mb-2">Filter Options</div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="date-range" className="text-xs">Date Range</Label>
+                      <div className="flex space-x-2 mt-1">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              id="date-from"
+                              variant="outline"
+                              size="sm"
+                              className="w-full justify-start text-left font-normal"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {dateRange.from ? (
+                                format(dateRange.from, "MMM yyyy")
+                              ) : (
+                                <span>Start date</span>
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={dateRange.from}
+                              onSelect={(date) => 
+                                setDateRange({ ...dateRange, from: date })
+                              }
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              id="date-to"
+                              variant="outline"
+                              size="sm"
+                              className="w-full justify-start text-left font-normal"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {dateRange.to ? (
+                                format(dateRange.to, "MMM yyyy")
+                              ) : (
+                                <span>End date</span>
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={dateRange.to}
+                              onSelect={(date) => 
+                                setDateRange({ ...dateRange, to: date })
+                              }
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="product-filter" className="text-xs">Product</Label>
+                      <Select 
+                        value={productFilter} 
+                        onValueChange={setProductFilter}
+                      >
+                        <SelectTrigger id="product-filter" className="mt-1">
+                          <SelectValue placeholder="All Products" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Products</SelectItem>
+                          {allProductsData.slice(0, 10).map(product => (
+                            <SelectItem key={product.id} value={product.name}>
+                              {product.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="location-filter" className="text-xs">Location</Label>
+                      <Select 
+                        value={locationFilter} 
+                        onValueChange={setLocationFilter}
+                      >
+                        <SelectTrigger id="location-filter" className="mt-1">
+                          <SelectValue placeholder="All Locations" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Locations</SelectItem>
+                          {locationRevenueData.map(location => (
+                            <SelectItem key={location.name} value={location.name}>
+                              {location.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end mt-4">
+                    <Button 
+                      size="sm" 
+                      variant="secondary"
+                      className="mr-2"
+                      onClick={() => {
+                        setDateRange({ from: undefined, to: undefined });
+                        setProductFilter("all");
+                        setLocationFilter("all");
+                      }}
+                    >
+                      Reset
+                    </Button>
+                    <Button 
+                      size="sm"
+                      onClick={applyFilters}
+                    >
+                      Apply Filters
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="h-[600px]">
               <ChartContainer
@@ -370,7 +563,7 @@ export default function DashboardPage() {
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
-                    data={revenueData}
+                    data={filteredRevenueData}
                     margin={{
                       top: 20,
                       right: 30,
@@ -388,7 +581,7 @@ export default function DashboardPage() {
                     <Line
                       type="monotone"
                       dataKey="revenue"
-                      stroke="var(--color-revenue)"
+                      stroke="blue"
                       strokeWidth={2}
                       activeDot={{ r: 8 }}
                       name="Revenue"
@@ -415,6 +608,13 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle>Revenue by Product</CardTitle>
               <CardDescription>Distribution of revenue across different products</CardDescription>
+              <div className="mt-2 flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: "hsl(var(--chart-2))" }}></div>
+                  <div className="h-3 w-3 rounded-sm ml-1" style={{ backgroundColor: "hsl(var(--chart-3))" }}></div>
+                  <span>Revenue (alternating)</span>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="h-[600px]">
               <ChartContainer
@@ -423,6 +623,10 @@ export default function DashboardPage() {
                     label: "Revenue",
                     color: "hsl(var(--chart-2))",
                   },
+                  profit: {
+                    label: "Profit",
+                    color: "hsl(var(--chart-4))",
+                  }
                 }}
               >
                 <ResponsiveContainer width="100%" height="100%">
@@ -434,8 +638,8 @@ export default function DashboardPage() {
                       left: 20,
                       bottom: 20,
                     }}
-                    barCategoryGap={4} // Reduce gap between categories
-                    barGap={2} // Reduce gap between bars in same category
+                    barCategoryGap={4}
+                    barGap={2}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
@@ -446,10 +650,17 @@ export default function DashboardPage() {
                     <Legend />
                     <Bar 
                       dataKey="revenue" 
-                      fill="var(--color-revenue)" 
+                      name="Revenue"
+                      barSize={20}
                       radius={[4, 4, 0, 0]}
-                      barSize={30} // Adjusted bar size
-                    />
+                    >
+                      {productRevenueData.map((entry, index) => (
+                        <Cell 
+                          key={`${entry.name}-${index}`}
+                          fill={index % 2 === 0 ? "hsl(var(--chart-2))" : "hsl(var(--chart-3))"}
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -457,32 +668,36 @@ export default function DashboardPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="customers">
+        <TabsContent value="locations">
           <Card>
             <CardHeader>
               <CardTitle>Revenue by Location</CardTitle>
               <CardDescription>Distribution of revenue across different locations</CardDescription>
+              <div className="mt-2 flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: "orange" }}></div>
+                  <span>Revenue by Location</span>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="h-[600px]">
               <ChartContainer
                 config={{
                   revenue: {
                     label: "Revenue",
-                    color: "hsl(var(--chart-3))",
-                  },
+                    color: "orange",
+                  }
                 }}
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={customerRevenueData}
+                    data={locationRevenueData}
                     margin={{
                       top: 20,
                       right: 30,
                       left: 20,
                       bottom: 20,
                     }}
-                    barCategoryGap={4} // Reduce gap between categories
-                    barGap={2} // Reduce gap between bars in same category
                   >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
@@ -493,10 +708,12 @@ export default function DashboardPage() {
                     <Legend />
                     <Bar 
                       dataKey="revenue" 
-                      fill="var(--color-revenue)" 
-                      radius={[4, 4, 0, 0]} 
-                      barSize={30} // Adjusted bar size 
-                    />
+                      name="Revenue"
+                      barSize={25}
+                      radius={[4, 4, 0, 0]}
+                      fill="orange"
+                    >
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -507,18 +724,20 @@ export default function DashboardPage() {
         <TabsContent value="profitable">
           <Card>
             <CardHeader>
-              <div className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Top {NUM_TOP_PRODUCTS} Profitable Products</CardTitle>
-                  <CardDescription>Products with the highest profit margins</CardDescription>
+              <CardTitle>Profitable Products</CardTitle>
+              <CardDescription>Top profitable products</CardDescription>
+              <div className="flex justify-between mt-2">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: "green" }}></div>
+                  <span>Profit</span>
                 </div>
                 <Button 
                   variant="outline" 
+                  size="sm" 
                   onClick={() => setShowAllProductsModal(true)}
-                  className="flex items-center gap-2"
+                  className="text-xs"
                 >
-                  <ListFilter className="h-4 w-4" />
-                  Show All Products
+                  View All Products
                 </Button>
               </div>
             </CardHeader>
@@ -527,49 +746,35 @@ export default function DashboardPage() {
                 config={{
                   profit: {
                     label: "Profit",
-                    color: "hsl(var(--chart-4))",
-                  },
+                    color: "green",
+                  }
                 }}
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={topProductsData}
-                    layout="vertical"
                     margin={{
                       top: 20,
-                      right: 60, // Increase right margin to accommodate full bars
-                      left: 100,
-                      bottom: 20, // Increased from 5 to ensure bottom grid coverage
+                      right: 30,
+                      left: 20,
+                      bottom: 20,
                     }}
-                    barCategoryGap={1} // Minimize gap between categories
-                    barGap={0} // Minimize gap between bars in same category
                   >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} />
-                    <XAxis 
-                      type="number" 
-                      tickFormatter={(value) => `$${value.toLocaleString()}`} 
-                      domain={[0, 'dataMax']} // Ensure axis accommodates full data range
-                      padding={{ left: 0, right: 30 }} // Add padding to the axis
-                      allowDataOverflow={false} // Don't allow data to overflow the axis
-                    />
-                    <YAxis 
-                      type="category" 
-                      dataKey="name" 
-                      interval={0} 
-                      width={90}
-                      padding={{ top: 10, bottom: 10 }} // Add padding to prevent cutoff
-                    />
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis tickFormatter={(value) => `$${value.toLocaleString()}`} />
                     <ChartTooltip
                       content={<ChartTooltipContent formatter={(value) => `$${Number(value).toLocaleString()}`} />}
                     />
                     <Legend />
                     <Bar 
                       dataKey="profit" 
-                      fill="var(--color-profit)" 
-                      radius={[0, 4, 4, 0]} 
-                      barSize={28} // Adjusted bar size for better visibility
-                      isAnimationActive={false} // Disable animation to avoid potential issues with sizing
-                    />
+                      name="Profit"
+                      barSize={25}
+                      radius={[4, 4, 0, 0]}
+                      fill="green"
+                    >
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -577,47 +782,38 @@ export default function DashboardPage() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Dialog for showing all products */}
+        </>
+      )}
+      
+      {/* Add back the All Products Modal */}
       <Dialog open={showAllProductsModal} onOpenChange={setShowAllProductsModal}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>All Products Ranked by Profit</DialogTitle>
-            <DialogDescription>
-              Complete ranking of all {allProductsData.length} products by profit
-            </DialogDescription>
+            <DialogTitle>All Products</DialogTitle>
+            <DialogDescription>Complete list of products ordered by profit</DialogDescription>
           </DialogHeader>
-          
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Rank</TableHead>
-                <TableHead>Product ID</TableHead>
-                <TableHead>Product Name</TableHead>
-                <TableHead className="text-right">Profit</TableHead>
+                <TableHead>Product</TableHead>
                 <TableHead className="text-right">Revenue</TableHead>
+                <TableHead className="text-right">Profit</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {allProductsData.map((product, index) => (
-                <TableRow key={product.id} className={index < NUM_TOP_PRODUCTS ? "bg-green-50" : ""}>
-                  <TableCell className="font-medium">{index + 1}</TableCell>
-                  <TableCell>{product.id}</TableCell>
+                <TableRow key={product.id || index}>
+                  <TableCell>{index + 1}</TableCell>
                   <TableCell>{product.name}</TableCell>
-                  <TableCell className="text-right">${product.profit.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">${product.revenue?.toLocaleString() || "-"}</TableCell>
+                  <TableCell className="text-right">${product.revenue?.toLocaleString() || 0}</TableCell>
+                  <TableCell className="text-right">${product.profit?.toLocaleString() || 0}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-          
-          <div className="flex justify-end mt-4">
-            <Button onClick={() => setShowAllProductsModal(false)}>Close</Button>
-          </div>
         </DialogContent>
       </Dialog>
-        </>
-      )}
     </div>
   )
 }

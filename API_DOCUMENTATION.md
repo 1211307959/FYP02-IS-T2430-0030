@@ -1,7 +1,7 @@
 # Revenue Prediction API Documentation
 
 ## Overview
-This API provides revenue prediction services for small businesses. It uses an XGBoost model trained on a 50/50 split of historical sales data to predict revenue based on various inputs such as product information, pricing, and location data. The model achieves 99.4% accuracy (R² = 0.9947) on the test set.
+This API provides revenue prediction services for small businesses. It uses an XGBoost model trained on a 50/50 split of historical sales data to predict revenue based on various inputs such as product information, pricing, and location data. The model achieves 99.4% accuracy (R² = 0.9947) on the test set. The system now automatically combines all CSV files in the data directory for comprehensive analysis.
 
 ## Base URL
 ```
@@ -10,6 +10,19 @@ http://localhost:5000
 
 ## Authentication
 Currently, the API does not require authentication as it is designed for internal use only.
+
+## Data Processing
+The system now automatically processes all CSV files in the data directory:
+
+1. **Automatic Combination:**
+   - All CSV files in the data folder are loaded simultaneously
+   - Data is combined into a unified dataset for analysis
+   - No manual file selection required
+
+2. **Column Compatibility:**
+   - System automatically identifies common columns across all files
+   - Only shared columns are used in the combined dataset
+   - Source file tracking is maintained for advanced analysis
 
 ## Endpoints
 
@@ -26,8 +39,9 @@ Checks the status of the API and model.
   "model_version": "50/50 Split XGBoost",
   "model_message": "Revenue model loaded successfully",
   "data_status": "healthy",
-  "data_message": "CSV data loaded successfully",
-  "current_data_file": "trainingdataset.csv"
+  "data_message": "Combined data loaded successfully from 3 files",
+  "files_count": 3,
+  "combined_rows": 250000
 }
 ```
 
@@ -47,45 +61,44 @@ Basic connectivity check.
 ### List Data Files
 **GET /data-files**
 
-Lists all available data files that can be used for predictions.
-
-**Response:**
-```json
-{
-  "files": [
-    "Adjusted_Sales_Data_With_Location_100K_ValidDates.csv",
-    "Adjusted_Sales_Data_Original.csv"
-  ],
-  "current_file": "Adjusted_Sales_Data_With_Location_100K_ValidDates.csv",
-  "count": 2
-}
-```
-
-### Select Data File
-**POST /select-data-file**
-
-Selects a specific data file to use for subsequent operations.
-
-**Request:**
-```json
-{
-  "filename": "Adjusted_Sales_Data_With_Location_100K_ValidDates.csv"
-}
-```
+Lists all available data files in the data directory that are being combined for predictions.
 
 **Response:**
 ```json
 {
   "status": "success",
-  "message": "Successfully loaded data from Adjusted_Sales_Data_With_Location_100K_ValidDates.csv",
-  "rows": 100000
+  "files": [
+    "Adjusted_Sales_Data_With_Location_100K_ValidDates.csv",
+    "Adjusted_Sales_Data_Original.csv",
+    "seasonal_data.csv"
+  ],
+  "current_mode": "combined",
+  "message": "Using combined data from 3 files"
+}
+```
+
+### Reload Data Files
+**GET /reload**
+
+Reloads all data files from the data directory and rebuilds the combined dataset.
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Combined data loaded from 3 files with 250000 total rows",
+  "files": [
+    "Adjusted_Sales_Data_With_Location_100K_ValidDates.csv",
+    "Adjusted_Sales_Data_Original.csv",
+    "seasonal_data.csv"
+  ]
 }
 ```
 
 ### Get Products
 **GET /products**
 
-Returns a list of unique products from the dataset.
+Returns a list of unique products from the combined dataset.
 
 **Response:**
 ```json
@@ -99,7 +112,7 @@ Returns a list of unique products from the dataset.
 ### Get Locations
 **GET /locations**
 
-Returns a list of unique locations from the dataset.
+Returns a list of unique locations from the combined dataset.
 
 **Response:**
 ```json
@@ -114,7 +127,7 @@ Returns a list of unique locations from the dataset.
 ### Dashboard Data
 **GET /dashboard-data**
 
-Returns aggregated data for dashboard visualizations.
+Returns aggregated data for dashboard visualizations from the combined dataset.
 
 **Response:**
 ```json
@@ -144,7 +157,7 @@ Returns aggregated data for dashboard visualizations.
 ### Predict Revenue
 **POST /predict-revenue**
 
-Predicts revenue using the 50/50 split XGBoost model.
+Predicts revenue using the 50/50 split XGBoost model based on the combined dataset.
 
 **Request:**
 ```json
@@ -152,7 +165,7 @@ Predicts revenue using the 50/50 split XGBoost model.
   "Unit Price": 100.00,
   "Unit Cost": 50.00,
   "Location": "North",
-  "ProductID": 12,
+  "_ProductID": 12,
   "Month": 6,
   "Day": 15,
   "Weekday": "Friday"
@@ -172,150 +185,178 @@ Predicts revenue using the 50/50 split XGBoost model.
 ### Simulate Revenue
 **POST /simulate-revenue**
 
-Simulates revenue for different price points using the 50/50 split model.
+Simulates revenue for different price points using the 50/50 split model with insights from the combined dataset.
 
 **Request:**
 ```json
 {
-  "base_price": 100.00,
-  "unit_cost": 50.00,
-  "location": "North",
-  "product_id": 12,
-  "month": 6,
-  "day": 15,
-  "weekday": "Friday",
-  "price_variations": [-20, -10, 0, 10, 20]
+  "Unit Price": 100.00,
+  "Unit Cost": 50.00,
+  "Location": "North",
+  "_ProductID": 12,
+  "Month": 6,
+  "Day": 15,
+  "Weekday": "Friday",
+  "min_price_factor": 0.5,
+  "max_price_factor": 2.0,
+  "steps": 7
 }
 ```
 
 **Response:**
 ```json
 {
-  "base_price": 100.00,
-  "variations": [
+  "status": "success",
+  "results": [
     {
-      "price": 80.00,
-      "predicted_revenue": 1030.77,
-      "predicted_quantity": 12,
-      "profit_margin": 37.5,
-      "total_profit": 360.00
+      "Scenario": "50% of Price",
+      "Unit Price": 50.00,
+      "Predicted Revenue": 850.00,
+      "Predicted Quantity": 17,
+      "Profit": 450.00
     },
     {
-      "price": 90.00,
-      "predicted_revenue": 1049.52,
-      "predicted_quantity": 11,
-      "profit_margin": 44.4,
-      "total_profit": 440.00
+      "Scenario": "75% of Price",
+      "Unit Price": 75.00,
+      "Predicted Revenue": 975.00,
+      "Predicted Quantity": 13,
+      "Profit": 525.00
     },
     {
-      "price": 100.00,
-      "predicted_revenue": 1054.21,
-      "predicted_quantity": 10,
-      "profit_margin": 50.0,
-      "total_profit": 500.00
+      "Scenario": "100% of Price",
+      "Unit Price": 100.00,
+      "Predicted Revenue": 1054.21,
+      "Predicted Quantity": 10,
+      "Profit": 500.00
     },
     {
-      "price": 110.00,
-      "predicted_revenue": 1073.89,
-      "predicted_quantity": 9,
-      "profit_margin": 54.5,
-      "total_profit": 540.00
+      "Scenario": "125% of Price",
+      "Unit Price": 125.00,
+      "Predicted Revenue": 1087.50,
+      "Predicted Quantity": 8,
+      "Profit": 600.00
     },
     {
-      "price": 120.00,
-      "predicted_revenue": 1087.26,
-      "predicted_quantity": 8,
-      "profit_margin": 58.3,
-      "total_profit": 560.00
+      "Scenario": "150% of Price",
+      "Unit Price": 150.00,
+      "Predicted Revenue": 1050.00,
+      "Predicted Quantity": 7,
+      "Profit": 700.00
+    },
+    {
+      "Scenario": "175% of Price",
+      "Unit Price": 175.00,
+      "Predicted Revenue": 875.00,
+      "Predicted Quantity": 5,
+      "Profit": 625.00
+    },
+    {
+      "Scenario": "200% of Price",
+      "Unit Price": 200.00,
+      "Predicted Revenue": 600.00,
+      "Predicted Quantity": 3,
+      "Profit": 450.00
     }
   ],
-  "optimal_price": 120.00,
-  "optimal_profit": 560.00,
-  "price_elasticity": -0.42
+  "simulations": [
+    // Same content as results
+  ]
 }
 ```
 
 ### Get Data
 **GET /data**
 
-Returns a sample of the current dataset.
+Returns a sample of the current combined dataset.
 
 **Response:**
 ```json
 {
-  "count": 100000,
+  "count": 250000,
+  "combined_from": 3,
   "sample": [
     {
       "Location": "North",
       "_ProductID": 12,
-      "Order Quantity": 5,
-      "Unit Cost": 50,
-      "Unit Price": 100,
-      "Total Cost": 250,
-      "Total Revenue": 500,
-      "Profit": 250
-    }
-  ],
-  "columns": ["Location", "_ProductID", "Order Quantity", "Unit Cost", "Unit Price", "Total Cost", "Total Revenue", "Profit"]
+      "Unit Price": 100.00,
+      "Unit Cost": 50.00,
+      "Month": 6,
+      "Day": 15,
+      "Weekday": "Friday",
+      "Year": 2022,
+      "Total Revenue": 1050.00,
+      "Quantity": 10,
+      "_source_file": "Adjusted_Sales_Data_With_Location_100K_ValidDates.csv"
+    },
+    // More samples...
+  ]
 }
 ```
 
-### Reload
-**GET /reload**
+### Upload File
+**POST /upload-file**
 
-Reloads the model and data files.
+Uploads a new CSV file to the data directory. The file will be automatically included in the combined dataset.
+
+**Request:**
+Form data with file field containing a CSV file.
 
 **Response:**
 ```json
 {
   "status": "success",
-  "message": "Reloaded models and data files",
-  "model_status": "healthy",
-  "model_message": "Revenue model reloaded successfully",
-  "files": ["Adjusted_Sales_Data_With_Location_100K_ValidDates.csv", "Adjusted_Sales_Data_Original.csv"]
+  "filename": "new_sales_data.csv",
+  "message": "File uploaded successfully: new_sales_data.csv"
 }
 ```
 
 ## Error Handling
 
 All endpoints return appropriate HTTP status codes:
-
-- 200: Successful request
-- 400: Bad request (invalid parameters)
+- 200: Success
+- 400: Bad request (e.g., invalid input)
 - 404: Resource not found
 - 500: Server error
 
-Error responses include a descriptive message:
-
+Error responses have the following format:
 ```json
 {
-  "error": "Missing required fields: Unit Price, Unit Cost"
+  "error": "Detailed error message"
 }
 ```
 
-## Data Types
+## Data Requirements
 
-### Input Fields
-- **Unit Price**: Float (required) - Selling price per unit
-- **Unit Cost**: Float (required) - Cost per unit
-- **Location**: String (required) - Regional location
-- **ProductID**: Integer (required) - Product identifier
-- **Month**: Integer (required) - Month of the order (1-12)
-- **Day**: Integer (required) - Day of the month (1-31)
-- **Weekday**: String (required) - Day of the week (Monday-Sunday)
+For optimal performance when adding new CSV files, ensure they include the following columns:
+- `_ProductID`: Product identifier (required)
+- `Unit Price`: Price of the product (required)
+- `Unit Cost`: Cost of the product (required)
+- `Location`: Geographic region (required)
+- `Month`: Month of transaction (1-12)
+- `Day`: Day of month (1-31)
+- `Weekday`: Day of week (e.g., "Monday")
+- `Year`: Year of transaction
+- `Total Revenue`: Total revenue for the transaction (for training data)
+- `Quantity`: Number of units sold (for training data)
 
-### Output Fields
-- **predicted_revenue**: Float - Predicted total revenue
-- **confidence_score**: Float - Confidence score of the prediction
-- **predicted_quantity**: Integer - Predicted number of units ordered
-- **estimated_profit**: Float - Estimated profit (revenue - total cost)
+The system will automatically identify common columns across all files and use them in the combined dataset.
 
-## Model Information
-- **Algorithm**: XGBoost
-- **Features**: Unit Price, Unit Cost, Location, Product ID, Month, Day, Weekday
-- **Performance**: R² = 0.9947 (on test set)
+## Best Practices
 
-See [MODEL_DOCUMENTATION.md](MODEL_DOCUMENTATION.md) for detailed model information.
+1. **Data Files:**
+   - Use consistent column names across all CSV files
+   - Ensure date-related fields are properly formatted
+   - Include all required columns for best prediction results
+
+2. **API Usage:**
+   - Use the `/health` endpoint to verify API status before making predictions
+   - Regularly check `/data-files` to confirm which files are being used
+   - After uploading new files, call `/reload` to ensure data is refreshed
+
+3. **Predictions:**
+   - Use the `/simulate-revenue` endpoint to test different price points
+   - Include all context fields (location, dates, etc.) for most accurate predictions
+   - For new products, use similar existing products as references
 
 # IDSS API Documentation
 

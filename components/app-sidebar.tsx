@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { ApiStatus } from "@/components/api-status"
+import { DataFileIndicator } from "@/components/ui/data-file-indicator"
 
 export function AppSidebar() {
   const pathname = usePathname()
@@ -94,6 +95,9 @@ export function AppSidebar() {
         </div>
         <div className="mt-2">
           <ApiStatus />
+        </div>
+        <div className="mt-2">
+          <DataFileIndicator />
         </div>
       </div>
     </div>

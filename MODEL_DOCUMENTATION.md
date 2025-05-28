@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This documentation describes our revenue prediction system for small businesses, focusing on the **XGBoost Revenue Prediction Model with 50/50 Split**. The system provides accurate revenue predictions and pricing insights for strategic decision-making, achieving an exceptional **R² = 0.9947** on the test set.
+This documentation describes our revenue prediction system for small businesses, focusing on the **XGBoost Revenue Prediction Model with 50/50 Split**. The system provides accurate revenue predictions and pricing insights for strategic decision-making, achieving an exceptional **R² = 0.9947** on the test set. The system now features automatic multi-file data processing, combining all available CSV files for comprehensive analysis.
 
 ## Model Architecture
 
@@ -15,11 +15,16 @@ This documentation describes our revenue prediction system for small businesses,
 - **Model Files:**
   - `best_revenue_model.pkl` (Trained model)
   - `revenue_encoders.pkl` (Feature encoders)
+- **Data Processing:**
+  - Automatic combination of all data files
+  - Common column detection across files
+  - Source tracking for advanced analysis
 
 ### Model Performance
 - **R² Score:** 0.9947 (test set)
 - **Prediction Latency:** <1ms per prediction
 - **Price Elasticity:** -0.42 (average)
+- **Multi-file Performance:** Scales linearly with data volume
 
 ### Key Features
 Feature importance ranking:
@@ -49,6 +54,37 @@ Feature importance ranking:
    - Product category
    - Historical performance
    - Product popularity metrics
+
+5. **Multi-file Features**
+   - Source file tracking
+   - Cross-file pattern detection
+   - Aggregated metrics across datasets
+
+## Data Handling
+
+### Multi-File Processing
+The system now automatically processes all CSV files in the data directory:
+
+1. **Automatic Combination:**
+   - All CSV files in the data folder are loaded simultaneously
+   - Data is combined into a unified dataset for analysis
+   - No manual file selection required
+
+2. **Column Compatibility:**
+   - System automatically identifies common columns across all files
+   - Only shared columns are used in the combined dataset
+   - Source file tracking is maintained for advanced analysis
+
+3. **Benefits:**
+   - Work with multiple data sources simultaneously
+   - No need to merge files manually
+   - Richer dataset for more accurate predictions
+   - Maintain historical context across files
+
+4. **Compatibility Requirements:**
+   - Files must share core columns (ProductID, Unit Price, etc.)
+   - CSV format required for all files
+   - Column names must be consistent across files
 
 ## API Integration
 
@@ -109,6 +145,18 @@ Feature importance ranking:
 }
 ```
 
+### Multi-File Data Access
+**Endpoint:** `/data-files`
+```json
+// Response
+{
+  "status": "success",
+  "files": ["sales_2022.csv", "sales_2023.csv", "seasonal_data.csv"],
+  "current_mode": "combined",
+  "message": "Using combined data from 3 files"
+}
+```
+
 ## Business Benefits
 
 1. **High Accuracy**
@@ -129,6 +177,11 @@ Feature importance ranking:
    - Sub-millisecond response time
    - Suitable for real-time applications
    - Batch prediction support
+
+5. **Multi-file Analysis**
+   - Work with all data sources simultaneously
+   - No need for manual data merging
+   - Comprehensive view across different periods and sources
 
 ## Usage Examples
 
@@ -171,6 +224,11 @@ simulation = predictor.simulate_prices({
    - Limited accuracy for entirely new products
    - Requires similar product history for best results
 
+4. **Multi-file Requirements**
+   - Files must share common core columns
+   - Performance may degrade with highly inconsistent data formats
+   - Large combined datasets may require more memory
+
 ## Future Improvements
 
 1. **Model Updates**
@@ -188,6 +246,11 @@ simulation = predictor.simulate_prices({
    - Risk assessment
    - Anomaly detection
 
+4. **Advanced Multi-file Processing**
+   - Intelligent column mapping for inconsistent files
+   - Automated data quality assessment
+   - Cross-file pattern recognition
+
 ## Maintenance
 
 The model should be:
@@ -195,5 +258,6 @@ The model should be:
 2. Validated against actual revenues
 3. Updated for new products/locations
 4. Monitored for drift and performance
+5. Data directory should be regularly backed up
 
 See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for detailed API usage. 
