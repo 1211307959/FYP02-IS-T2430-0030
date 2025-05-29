@@ -8,13 +8,19 @@ import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { ApiStatus } from "@/components/api-status"
 import { DataFileIndicator } from "@/components/ui/data-file-indicator"
+import { useState } from "react"
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen)
+  }
 
   const routes = [
     {
-      title: "Dashboard",
+      title: "Home",
       icon: Home,
       href: "/",
       isActive: pathname === "/",
@@ -58,13 +64,18 @@ export function AppSidebar() {
   ]
 
   return (
-    <div className="sidebar h-screen w-64 flex flex-col">
-      <div className="sidebar-header">
+    <div className={`sidebar h-screen ${isSidebarOpen ? 'w-64' : 'w-16'} flex flex-col transition-all duration-300`}>
+      <div className="sidebar-header flex items-center justify-between px-4 py-3 border-b">
         <div className="flex items-center space-x-2">
           <LineChart className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          <span className="font-bold text-lg">IDSS</span>
+          {isSidebarOpen && <span className="font-bold text-lg">IDSS</span>}
         </div>
-        <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="h-8 w-8 p-0"
+          onClick={toggleSidebar}
+        >
           <span className="sr-only">Toggle Sidebar</span>
           <MenuIcon className="h-4 w-4" />
         </Button>
@@ -77,28 +88,41 @@ export function AppSidebar() {
               key={route.href}
               href={route.href}
               className={cn(
-                "sidebar-link",
-                route.isActive ? "sidebar-link-active" : "sidebar-link-inactive"
+                "sidebar-link flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                route.isActive 
+                  ? "bg-muted text-primary hover:bg-muted/80" 
+                  : "text-muted-foreground hover:bg-muted hover:text-primary",
+                isSidebarOpen ? "justify-start space-x-3" : "justify-center"
               )}
+              title={!isSidebarOpen ? route.title : undefined}
             >
-              <route.icon className="h-4 w-4" />
-              <span>{route.title}</span>
+              <route.icon className="h-4 w-4 flex-shrink-0" />
+              {isSidebarOpen && <span>{route.title}</span>}
             </Link>
           ))}
         </nav>
       </div>
       
       <div className="border-t p-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-gray-500 dark:text-gray-400">Business Intelligence</span>
-          <ModeToggle />
-        </div>
-        <div className="mt-2">
-          <ApiStatus />
-        </div>
-        <div className="mt-2">
-          <DataFileIndicator />
-        </div>
+        {isSidebarOpen && (
+          <>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400">Business Intelligence</span>
+              <ModeToggle />
+            </div>
+            <div className="mt-2">
+              <ApiStatus />
+            </div>
+            <div className="mt-2">
+              <DataFileIndicator />
+            </div>
+          </>
+        )}
+        {!isSidebarOpen && (
+          <div className="flex justify-center">
+            <ModeToggle />
+          </div>
+        )}
       </div>
     </div>
   )

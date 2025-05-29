@@ -28,6 +28,14 @@ graph TD
     H[Multiple CSV Files] --> C
 ```
 
+### Use Case Diagram
+
+### Activity Diagram
+
+### Class Diagram
+
+### Sequence Diagram
+
 ## Tech Stack
 **Frontend**:
 - Next.js 14 (React)

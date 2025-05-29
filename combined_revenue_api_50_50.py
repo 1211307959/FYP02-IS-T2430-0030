@@ -264,9 +264,9 @@ def get_dashboard_data():
             
             # Convert to list of dicts for the chart
             for _, row in product_revenue.iterrows():
-                product_id = row['_ProductID']
+                product_id = int(row['_ProductID'])
                 product_revenue_data.append({
-                    'id': int(product_id),
+                    'id': product_id,
                     'product': f"Product {product_id}",
                     'name': f"Product {product_id}",
                     'revenue': round(float(row['Total Revenue']), 2)

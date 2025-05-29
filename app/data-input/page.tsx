@@ -390,341 +390,373 @@ export default function DataInputPage() {
   }
 
   return (
-    <div className="container py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Sales Data Input</h1>
-      </div>
+    <div className="container py-4 sm:py-6 md:py-8 px-2 sm:px-4 md:px-6">
+      <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">Data Input</h1>
 
       {error && (
-        <Alert variant="destructive" className="mb-6">
+        <Alert variant="destructive" className="mb-4 sm:mb-6">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      <Tabs defaultValue="upload" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="upload">Upload CSV</TabsTrigger>
-          <TabsTrigger value="manual">Manual Input</TabsTrigger>
+      <Tabs defaultValue="file-upload" className="space-y-4 sm:space-y-6">
+        <TabsList className="flex flex-wrap">
+          <TabsTrigger className="flex-grow text-xs sm:text-sm" value="file-upload">
+            <Upload className="mr-2 h-4 w-4" />
+            File Upload
+          </TabsTrigger>
+          <TabsTrigger className="flex-grow text-xs sm:text-sm" value="manual-entry">
+            <FileUp className="mr-2 h-4 w-4" />
+            Manual Entry
+          </TabsTrigger>
+          <TabsTrigger className="flex-grow text-xs sm:text-sm" value="revenue-prediction">
+            <BarChart className="mr-2 h-4 w-4" />
+            Revenue Prediction
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="upload" className="space-y-4">
+        <TabsContent value="file-upload" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Upload Sales Data</CardTitle>
-              <CardDescription>Upload your CSV file with sales data in the required format.</CardDescription>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-lg sm:text-xl">Upload Data File</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                Upload a CSV file with your sales data for analysis.
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid w-full items-center gap-4">
-                <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 text-center">
-                  <Upload className="h-10 w-10 text-muted-foreground mb-4" />
-                  <div className="mb-4 text-sm text-muted-foreground">
-                    <span className="font-medium">Click to upload</span> or drag and drop
+            <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+              <div className="grid gap-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <Label htmlFor="file-upload" className="text-xs sm:text-sm">Select CSV File</Label>
+                    <Input
+                      id="file-upload"
+                      type="file"
+                      accept=".csv"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      className="mt-1 text-xs sm:text-sm h-9 sm:h-10"
+                    />
                   </div>
-                  <Input 
-                    id="file-upload" 
-                    ref={fileInputRef}
-                    type="file" 
-                    accept=".csv" 
-                    className="hidden" 
-                    onChange={handleFileChange} 
-                  />
-                  <div className="flex space-x-2">
-                  <Button asChild>
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      <FileUp className="mr-2 h-4 w-4" />
-                      Select CSV File
-                    </label>
-                  </Button>
-                    <Button variant="outline" onClick={handleLoadSampleData}>
-                      <Database className="mr-2 h-4 w-4" />
-                      Load Sample Data
+                  <div className="flex flex-row gap-2 items-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      onClick={handleClearFile}
+                      className="text-xs sm:text-sm h-9 sm:h-10"
+                      disabled={!file}
+                    >
+                      Clear File
                     </Button>
-                    {file && (
-                      <Button variant="outline" onClick={handleClearFile}>
-                        Clear File
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      onClick={handleLoadSampleData}
+                      className="text-xs sm:text-sm h-9 sm:h-10"
+                    >
+                      <Database className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />
+                      Load Sample
+                    </Button>
                   </div>
-                  {file && (
-                    <div className="mt-4">
-                      <p className="text-sm text-muted-foreground mb-2">Selected file: {file.name}</p>
-                      <Button 
-                        variant="secondary" 
-                        onClick={() => file && handleUploadToServer(file)}
-                        disabled={isLoading}
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        Save to Data Directory
-                      </Button>
-                    </div>
-                  )}
                 </div>
+
+                {file && (
+                  <div className="mt-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 text-green-500" />
+                      <span>
+                        {file.name} ({(file.size / 1024).toFixed(1)} KB)
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
+            <CardFooter className="p-4 sm:p-6 flex flex-col sm:flex-row justify-end gap-2">
+              <Button
+                type="button"
+                disabled={!file}
+                onClick={() => file && handleUploadToServer(file)}
+                className="w-full sm:w-auto text-xs sm:text-sm"
+              >
+                Process File
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {previewData.length > 0 && (
+            <Card>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-lg sm:text-xl">Data Preview</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Preview of the uploaded data. Click on a row to select it for prediction.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12 text-xs">ID</TableHead>
+                        <TableHead className="text-xs">Product</TableHead>
+                        <TableHead className="text-xs">Customer</TableHead>
+                        <TableHead className="text-xs">Unit Price</TableHead>
+                        <TableHead className="text-xs">Unit Cost</TableHead>
+                        <TableHead className="text-xs">Quantity</TableHead>
+                        <TableHead className="text-xs">Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {previewData.slice(0, 10).map((row, index) => (
+                        <TableRow
+                          key={row.id}
+                          className={selectedRowIndex === index ? "bg-muted" : ""}
+                          onClick={() => handleRowSelect(index)}
+                        >
+                          <TableCell className="text-xs font-medium">{row.id}</TableCell>
+                          <TableCell className="text-xs">{row._ProductID}</TableCell>
+                          <TableCell className="text-xs">{row._CustomerID}</TableCell>
+                          <TableCell className="text-xs">${row["Unit Price"]}</TableCell>
+                          <TableCell className="text-xs">${row["Unit Cost"]}</TableCell>
+                          <TableCell className="text-xs">{row["Order Quantity"]}</TableCell>
+                          <TableCell className="text-xs">{`${row.Month}/${row.Day} (${row.Weekday})`}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {previewData.length > 10 && (
+                  <div className="p-4 text-center text-xs text-muted-foreground">
+                    Showing 10 of {previewData.length} rows
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="manual-entry">
+          <Card>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-lg sm:text-xl">Manual Data Entry</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                Enter sales data manually for individual transactions.
+              </CardDescription>
+            </CardHeader>
+            <form onSubmit={handleManualSubmit}>
+              <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+                  <div className="grid gap-1 sm:gap-2">
+                    <Label htmlFor="productId" className="text-xs sm:text-sm">Product</Label>
+                    <Select
+                      value={formData.productId}
+                      onValueChange={(value) => handleSelectChange("productId", value)}
+                      disabled={isLoadingOptions}
+                    >
+                      <SelectTrigger id="productId" className="text-xs sm:text-sm h-8 sm:h-10">
+                        <SelectValue placeholder="Select a product" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[40vh]">
+                        {products.map((product) => (
+                          <SelectItem key={product.id} value={product.id} className="text-xs sm:text-sm">
+                            {product.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-1 sm:gap-2">
+                    <Label htmlFor="customerId" className="text-xs sm:text-sm">Customer</Label>
+                    <Select
+                      value={formData.customerId}
+                      onValueChange={(value) => handleSelectChange("customerId", value)}
+                      disabled={isLoadingOptions}
+                    >
+                      <SelectTrigger id="customerId" className="text-xs sm:text-sm h-8 sm:h-10">
+                        <SelectValue placeholder="Select a customer" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[40vh]">
+                        {customers.map((customer) => (
+                          <SelectItem key={customer.id} value={customer.id} className="text-xs sm:text-sm">
+                            {customer.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-1 sm:gap-2">
+                    <Label htmlFor="unitPrice" className="text-xs sm:text-sm">Unit Price ($)</Label>
+                    <Input
+                      id="unitPrice"
+                      name="unitPrice"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.unitPrice}
+                      onChange={handleInputChange}
+                      className="text-xs sm:text-sm h-8 sm:h-10"
+                    />
+                  </div>
+
+                  <div className="grid gap-1 sm:gap-2">
+                    <Label htmlFor="unitCost" className="text-xs sm:text-sm">Unit Cost ($)</Label>
+                    <Input
+                      id="unitCost"
+                      name="unitCost"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.unitCost}
+                      onChange={handleInputChange}
+                      className="text-xs sm:text-sm h-8 sm:h-10"
+                    />
+                  </div>
+
+                  <div className="grid gap-1 sm:gap-2">
+                    <Label htmlFor="orderQuantity" className="text-xs sm:text-sm">Quantity</Label>
+                    <Input
+                      id="orderQuantity"
+                      name="orderQuantity"
+                      type="number"
+                      min="1"
+                      value={formData.orderQuantity}
+                      onChange={handleInputChange}
+                      className="text-xs sm:text-sm h-8 sm:h-10"
+                    />
+                  </div>
+
+                  <div className="grid gap-1 sm:gap-2">
+                    <Label htmlFor="month" className="text-xs sm:text-sm">Month</Label>
+                    <Select
+                      value={formData.month}
+                      onValueChange={(value) => handleSelectChange("month", value)}
+                    >
+                      <SelectTrigger id="month" className="text-xs sm:text-sm h-8 sm:h-10">
+                        <SelectValue placeholder="Select month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {monthOptions.map((month) => (
+                          <SelectItem key={month.value} value={month.value} className="text-xs sm:text-sm">
+                            {month.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-1 sm:gap-2">
+                    <Label htmlFor="day" className="text-xs sm:text-sm">Day</Label>
+                    <Input
+                      id="day"
+                      name="day"
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={formData.day}
+                      onChange={handleInputChange}
+                      className="text-xs sm:text-sm h-8 sm:h-10"
+                    />
+                  </div>
+
+                  <div className="grid gap-1 sm:gap-2">
+                    <Label htmlFor="weekday" className="text-xs sm:text-sm">Weekday</Label>
+                    <Select
+                      value={formData.weekday}
+                      onValueChange={(value) => handleSelectChange("weekday", value)}
+                    >
+                      <SelectTrigger id="weekday" className="text-xs sm:text-sm h-8 sm:h-10">
+                        <SelectValue placeholder="Select weekday" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Monday" className="text-xs sm:text-sm">Monday</SelectItem>
+                        <SelectItem value="Tuesday" className="text-xs sm:text-sm">Tuesday</SelectItem>
+                        <SelectItem value="Wednesday" className="text-xs sm:text-sm">Wednesday</SelectItem>
+                        <SelectItem value="Thursday" className="text-xs sm:text-sm">Thursday</SelectItem>
+                        <SelectItem value="Friday" className="text-xs sm:text-sm">Friday</SelectItem>
+                        <SelectItem value="Saturday" className="text-xs sm:text-sm">Saturday</SelectItem>
+                        <SelectItem value="Sunday" className="text-xs sm:text-sm">Sunday</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="p-4 sm:p-6 flex justify-end">
+                <Button type="submit" className="w-full sm:w-auto text-xs sm:text-sm">Add Entry</Button>
+              </CardFooter>
+            </form>
           </Card>
         </TabsContent>
 
-        <TabsContent value="manual" className="space-y-4">
+        <TabsContent value="revenue-prediction" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Manual Data Entry</CardTitle>
-              <CardDescription>Enter sales data manually using the form below.</CardDescription>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-lg sm:text-xl">Revenue Prediction</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                Predict revenue for the selected entry or make custom predictions.
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleManualSubmit} className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="unitCost">Unit Cost</Label>
-                  <Input
-                    id="unitCost"
-                    name="unitCost"
-                    type="number"
-                    step="0.01"
-                    placeholder="10.00"
-                    value={formData.unitCost}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="unitPrice">Unit Price</Label>
-                  <Input
-                    id="unitPrice"
-                    name="unitPrice"
-                    type="number"
-                    step="0.01"
-                    placeholder="25.00"
-                    value={formData.unitPrice}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="orderQuantity">Order Quantity</Label>
-                  <Input
-                    id="orderQuantity"
-                    name="orderQuantity"
-                    type="number"
-                    placeholder="100"
-                    value={formData.orderQuantity}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="month">Month</Label>
-                  <Select value={formData.month} onValueChange={(value) => handleSelectChange("month", value)}>
-                    <SelectTrigger id="month">
-                      <SelectValue placeholder="Select month" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {monthOptions.map((month) => (
-                        <SelectItem key={month.value} value={month.value}>
-                          {month.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="day">Day</Label>
-                  <Input
-                    id="day"
-                    name="day"
-                    type="number"
-                    min="1"
-                    max="31"
-                    placeholder="15"
-                    value={formData.day}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="weekday">Weekday</Label>
-                  <Select value={formData.weekday} onValueChange={(value) => handleSelectChange("weekday", value)}>
-                    <SelectTrigger id="weekday">
-                      <SelectValue placeholder="Select weekday" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Monday">Monday</SelectItem>
-                      <SelectItem value="Tuesday">Tuesday</SelectItem>
-                      <SelectItem value="Wednesday">Wednesday</SelectItem>
-                      <SelectItem value="Thursday">Thursday</SelectItem>
-                      <SelectItem value="Friday">Friday</SelectItem>
-                      <SelectItem value="Saturday">Saturday</SelectItem>
-                      <SelectItem value="Sunday">Sunday</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="customerId">Location</Label>
-                  <Select value={formData.customerId} onValueChange={(value) => handleSelectChange("customerId", value)}>
-                    <SelectTrigger id="customerId">
-                      <SelectValue placeholder="Select location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="productId">Product ID</Label>
-                  <Select value={formData.productId} onValueChange={(value) => handleSelectChange("productId", value)}>
-                    <SelectTrigger id="productId">
-                      <SelectValue placeholder="Select product" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <Button type="submit" className="w-full">
-                    Add Entry
+            <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+              <div className="grid gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+                  <div className="text-sm">
+                    {selectedRowIndex !== null ? (
+                      <p>
+                        Selected entry: <span className="font-medium">#{previewData[selectedRowIndex]?.id}</span>
+                      </p>
+                    ) : previewData.length > 0 ? (
+                      <p>Using the most recent entry for prediction.</p>
+                    ) : (
+                      <p>No data available. Please upload a file or add entries.</p>
+                    )}
+                  </div>
+                  <Button
+                    onClick={handlePredictRevenue}
+                    disabled={previewData.length === 0 || isLoading}
+                    className="text-xs sm:text-sm h-8 sm:h-10"
+                  >
+                    {isLoading ? "Predicting..." : "Predict Revenue"}
                   </Button>
                 </div>
-              </form>
+
+                {predictionResults && (
+                  <Card className="mt-4 bg-muted/50">
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-base">Prediction Results</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="bg-background p-3 rounded-lg">
+                          <p className="text-xs text-muted-foreground">Predicted Revenue</p>
+                          <p className="text-xl font-bold">
+                            ${parseFloat(predictionResults.revenue).toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="bg-background p-3 rounded-lg">
+                          <p className="text-xs text-muted-foreground">Predicted Profit</p>
+                          <p className="text-xl font-bold">
+                            ${parseFloat(predictionResults.profit).toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="bg-background p-3 rounded-lg">
+                          <p className="text-xs text-muted-foreground">Predicted Quantity</p>
+                          <p className="text-xl font-bold">
+                            {predictionResults.quantity}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
-      {previewData.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Data Preview</CardTitle>
-            <CardDescription>Preview of the data that will be used for prediction. Click on a row to select it for prediction.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12"></TableHead>
-                    <TableHead>Unit Cost</TableHead>
-                    <TableHead>Unit Price</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Month</TableHead>
-                    <TableHead>Day</TableHead>
-                    <TableHead>Weekday</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Product ID</TableHead>
-                    <TableHead>Predicted Revenue</TableHead>
-                    <TableHead>Profit</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {previewData.map((row, index) => (
-                    <TableRow 
-                      key={row.id} 
-                      className={selectedRowIndex === index ? "bg-muted" : ""}
-                      onClick={() => handleRowSelect(index)}
-                    >
-                      <TableCell>
-                        {selectedRowIndex === index && <Check className="h-4 w-4 text-green-500" />}
-                      </TableCell>
-                      <TableCell>${row["Unit Cost"].toFixed(2)}</TableCell>
-                      <TableCell>${row["Unit Price"].toFixed(2)}</TableCell>
-                      <TableCell>{row["Order Quantity"]}</TableCell>
-                      <TableCell>{row.Month}</TableCell>
-                      <TableCell>{row.Day}</TableCell>
-                      <TableCell>{row.Weekday}</TableCell>
-                      <TableCell>{row._CustomerID}</TableCell>
-                      <TableCell>{row._ProductID}</TableCell>
-                      <TableCell>
-                        {row["Total Revenue"] ? 
-                          `$${row["Total Revenue"].toFixed(2)}` : 
-                          "-"}
-                      </TableCell>
-                      <TableCell>
-                        {row["Profit"] ? 
-                          `$${row["Profit"].toFixed(2)}` : 
-                          "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={handleClearFile}>
-              Clear Data
-            </Button>
-            <Button 
-              onClick={handlePredictRevenue} 
-              disabled={isLoading || previewData.length === 0}
-            >
-              <BarChart className="mr-2 h-4 w-4" />
-              {isLoading ? "Predicting..." : "Predict Revenue"}
-            </Button>
-          </CardFooter>
-        </Card>
-      )}
-
-      {predictionResults && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Prediction Results</CardTitle>
-            <CardDescription>Revenue prediction based on the selected data</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-lg border p-4">
-                <h3 className="text-lg font-semibold mb-1">Predicted Revenue</h3>
-                <p className="text-2xl font-bold text-green-600">
-                  ${predictionResults.predicted_revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="rounded-lg border p-4">
-                <h3 className="text-lg font-semibold mb-1">Predicted Profit</h3>
-                <p className="text-2xl font-bold text-blue-600">
-                  ${predictionResults.profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              </div>
-            </div>
-            
-            {predictionResults.profit < 0 && (
-              <Alert variant="destructive" className="mt-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Warning</AlertTitle>
-                <AlertDescription>
-                  This transaction is predicted to result in a loss. Consider adjusting the price or quantity.
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            {predictionResults.profit > 0 && 
-              (predictionResults.profit / predictionResults.predicted_revenue) < 0.1 && (
-              <Alert className="mt-4 border-amber-500 text-amber-500">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Low Profit Margin</AlertTitle>
-                <AlertDescription>
-                  This transaction has a profit margin below 10%. Consider strategies to increase margins.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

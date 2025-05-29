@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { ArrowUpRight, BarChart4, CircleAlert, DollarSign, Package, ShoppingBasket, TrendingDown, TrendingUp, Users } from "lucide-react"
+import { ArrowUpRight, BarChart4, CircleAlert, DollarSign, Package, ShoppingBasket, TrendingDown, TrendingUp, Users, RefreshCw } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -407,7 +407,7 @@ const recommendationDatabase = {
 };
 
 // Helper function to select a recommendation based on insight type and severity
-function getRecommendation(insightType, severity, data = {}) {
+function getRecommendation(insightType: string, severity: string, data: Record<string, any> = {}) {
   // Default to medium if severity is not specified
   const severityLevel = severity || 'medium';
   
@@ -417,15 +417,15 @@ function getRecommendation(insightType, severity, data = {}) {
   // Handle special cases for trend-based insights
   if (insightType === 'revenueTrend') {
     const trendDirection = data.isDecline ? 'decline' : 'growth';
-    recommendations = recommendationDatabase.revenueTrend[trendDirection]?.[severityLevel] || [];
+    recommendations = (recommendationDatabase.revenueTrend as any)[trendDirection]?.[severityLevel] || [];
   } else {
     // For other insight types
-    recommendations = recommendationDatabase[insightType]?.[severityLevel] || [];
+    recommendations = (recommendationDatabase as any)[insightType]?.[severityLevel] || [];
   }
   
   // If no recommendations found for this severity, try to fall back to medium
   if (recommendations.length === 0 && severityLevel !== 'medium') {
-    recommendations = recommendationDatabase[insightType]?.['medium'] || [];
+    recommendations = (recommendationDatabase as any)[insightType]?.['medium'] || [];
   }
   
   // If still no recommendations, return a generic one
@@ -445,7 +445,7 @@ function getRecommendation(insightType, severity, data = {}) {
 }
 
 // Map insight types to severity levels
-function mapPriorityToSeverity(priority) {
+function mapPriorityToSeverity(priority: number) {
   if (priority >= 5) return 'critical';
   if (priority >= 4) return 'high';
   if (priority >= 3) return 'medium';
@@ -453,7 +453,7 @@ function mapPriorityToSeverity(priority) {
 }
 
 // Get color for different severity levels
-function getBadgeColor(severity) {
+function getBadgeColor(severity: string) {
   switch (severity) {
     case 'critical': return 'bg-red-100 text-red-800';
     case 'high': return 'bg-amber-100 text-amber-800';
@@ -491,7 +491,7 @@ const calculatePriority = (metrics: {
 }
 
 // Helper function to choose the most appropriate recommendation from our database
-const getContextualRecommendation = (insightType, data, metrics) => {
+const getContextualRecommendation = (insightType: string, data: Record<string, any>, metrics: Record<string, any>) => {
   // Calculate overall priority from metrics
   const priority = calculatePriority(metrics);
   
@@ -586,11 +586,24 @@ function generateActionableInsights(data: any) {
       const declineRate1 = (last3Months[1].revenue - last3Months[0].revenue) / last3Months[0].revenue;
       const declineRate2 = (last3Months[2].revenue - last3Months[1].revenue) / last3Months[1].revenue;
       
+      // Calculate absolute change for recent months
+      const totalAbsoluteChange = last3Months[2].revenue - last3Months[0].revenue;
+      const totalRelativeChange = totalAbsoluteChange / last3Months[0].revenue;
+      
       // Check for declining trend
       const isDeclineTrend = declineRate1 < 0 && declineRate2 < 0;
       if (isDeclineTrend) {
         const avgDeclineRate = (Math.abs(declineRate1) + Math.abs(declineRate2)) / 2;
         const totalDecline = (last3Months[2].revenue - last3Months[0].revenue) / last3Months[0].revenue;
+        
+        // Calculate urgency based on the magnitude of decline
+        // This ensures that the same insight type can have different priorities based on data
+        let severity = "medium";
+        if (Math.abs(totalDecline) > 0.2) {
+          severity = "critical";
+        } else if (Math.abs(totalDecline) > 0.1) {
+          severity = "high";
+        }
         
         // Prepare metrics for priority calculation
         const metrics = {
@@ -613,11 +626,12 @@ function generateActionableInsights(data: any) {
         
         const recommendation = getContextualRecommendation('revenueTrend', revenueData, metrics);
         
-        insights.push({
+  insights.push({
           ...recommendation,
           icon: <TrendingDown className="h-5 w-5 text-amber-500" />,
-          category: "Revenue Growth",
-          timeframe: "immediate"
+          category: "Revenue",
+          timeframe: "immediate",
+          severity: severity
         });
       }
       
@@ -627,9 +641,20 @@ function generateActionableInsights(data: any) {
         const avgGrowthRate = (declineRate1 + declineRate2) / 2;
         const totalGrowth = (last3Months[2].revenue - last3Months[0].revenue) / last3Months[0].revenue;
         
+        // Calculate urgency based on growth rate - higher growth gets higher priority
+        // This ensures that the same insight type can have different priorities based on data
+        let severity = "medium";
+        if (totalGrowth > 0.3) {
+          severity = "high";
+        } else if (totalGrowth > 0.15) {
+          severity = "medium";
+        } else {
+          severity = "low";
+        }
+        
         // Prepare metrics for priority calculation
         const metrics = {
-          urgency: 3, // Moderate urgency to capitalize on growth
+          urgency: totalGrowth > 0.3 ? 4 : totalGrowth > 0.15 ? 3 : 2,
           impact: totalGrowth > 0.3 ? 5 : totalGrowth > 0.2 ? 4 : 3,
           scope: 4, // Company-wide opportunity
           trend: Math.min(3, Math.ceil(totalGrowth * 10)) // Positive trend
@@ -648,18 +673,69 @@ function generateActionableInsights(data: any) {
         
         const recommendation = getContextualRecommendation('revenueTrend', revenueData, metrics);
         
-        insights.push({
+      insights.push({
           ...recommendation,
           icon: <TrendingUp className="h-5 w-5 text-green-500" />,
-          category: "Revenue Growth",
-          timeframe: "short-term"
+          category: "Revenue",
+          timeframe: "short-term",
+          severity: severity
         });
       }
+      
+      // Check for pricing opportunities based on data
+      const hasRevenueData = Boolean(data.revenue_data && data.revenue_data.length);
+      const hasProductData = Boolean(data.top_products_data && data.top_products_data.length);
+      
+      // Only suggest pricing insights if we have enough data to make it meaningful
+      if (hasRevenueData && hasProductData && Math.abs(totalRelativeChange) > 0.1) {
+        // Determine if pricing could be a factor (if we have revenue changes but quantities haven't changed as much)
+        const hasPricingOpportunity = true; // This would normally check quantity vs revenue changes
+        
+        if (hasPricingOpportunity) {
+          // Calculate severity based on the potential impact
+          const pricingImpact = Math.abs(totalRelativeChange) * 100;
+          let severity = "medium";
+          if (pricingImpact > 25) {
+            severity = "high";
+          } else if (pricingImpact > 15) {
+            severity = "medium";
+          } else {
+            severity = "low";
+          }
+          
+          // Prepare metrics for priority calculation
+          const metrics = {
+            urgency: pricingImpact > 25 ? 4 : pricingImpact > 15 ? 3 : 2,
+            impact: pricingImpact > 25 ? 5 : pricingImpact > 15 ? 4 : 3,
+            scope: 4 // Company-wide opportunity
+          };
+          
+          // Pricing data for recommendation
+          const pricingData = {
+            title: "Optimize Pricing Strategy",
+            impact: pricingImpact,
+            metrics: {
+              potentialImpact: pricingImpact.toFixed(1) + "%",
+              revenueChange: totalRelativeChange > 0 ? "+" + (totalRelativeChange * 100).toFixed(1) + "%" : (totalRelativeChange * 100).toFixed(1) + "%"
+            }
+          };
+          
+          const recommendation = getContextualRecommendation('priceOptimization', pricingData, metrics);
+          
+          insights.push({
+            ...recommendation,
+            icon: <DollarSign className="h-5 w-5 text-emerald-500" />,
+            category: "Pricing",
+            timeframe: "medium-term",
+            severity: severity
+          });
+        }
+      }
     }
-  }
-  
+}
+
   // 2. Product Mix Insights
-  if (data.top_products_data && data.top_products_data.length > 0) {
+  if (data.top_products_data && data.top_products_data.length >= 3) {
     const profitMargins = data.top_products_data.map((p: any) => ({
       id: p.id,
       name: p.name || p.product,
@@ -668,31 +744,53 @@ function generateActionableInsights(data: any) {
       profit: p.profit || 0
     }));
     
+    type ProductMargin = {
+      id: any;
+      name: string;
+      margin: number;
+      revenue: number;
+      profit: number;
+    };
+    
     // Find high and low margin products
     const highMarginProducts = profitMargins
-      .filter((p: any) => p.margin > 30)
-      .sort((a: any, b: any) => b.margin - a.margin)
+      .filter((p: ProductMargin) => p.margin > 30)
+      .sort((a: ProductMargin, b: ProductMargin) => b.margin - a.margin)
       .slice(0, 3);
     
     const lowMarginProducts = profitMargins
-      .filter((p: any) => p.margin < 15 && p.margin > 0)
-      .sort((a: any, b: any) => a.margin - b.margin)
+      .filter((p: ProductMargin) => p.margin < 15 && p.margin > 0)
+      .sort((a: ProductMargin, b: ProductMargin) => a.margin - b.margin)
       .slice(0, 2);
     
+    // Only proceed if we found at least some high or low margin products
+    if (highMarginProducts.length > 0 || lowMarginProducts.length > 0) {
     // Calculate metrics for priority
-    const highMarginRevenue = highMarginProducts.reduce((sum, p) => sum + p.revenue, 0);
-    const lowMarginRevenue = lowMarginProducts.reduce((sum, p) => sum + p.revenue, 0);
-    const totalRevenue = profitMargins.reduce((sum, p) => sum + p.revenue, 0);
+      const highMarginRevenue = highMarginProducts.reduce((sum: number, p: any) => sum + p.revenue, 0);
+      const lowMarginRevenue = lowMarginProducts.reduce((sum: number, p: any) => sum + p.revenue, 0);
+      const totalRevenue = profitMargins.reduce((sum: number, p: any) => sum + p.revenue, 0);
     
     // Calculate impact based on revenue proportion
     const impactScore = Math.ceil(((highMarginRevenue + lowMarginRevenue) / totalRevenue) * 5);
     
-    // Calculate urgency based on margin spread
+      // Calculate urgency based on margin spread - the wider the spread, the more important to address
     const marginSpread = profitMargins.length > 1 ? 
-      Math.max(...profitMargins.map(p => p.margin)) - Math.min(...profitMargins.map(p => p.margin)) : 0;
+        Math.max(...profitMargins.map((p: any) => p.margin)) - Math.min(...profitMargins.map((p: any) => p.margin)) : 0;
+      
+      // Determine severity based on data-driven metrics
+      let severity = "medium";
+      if (marginSpread > 50) {
+        severity = "critical";
+      } else if (marginSpread > 30) {
+        severity = "high";
+      } else if (marginSpread > 20) {
+        severity = "medium";
+      } else {
+        severity = "low";
+      }
+      
     const urgencyScore = marginSpread > 50 ? 5 : marginSpread > 30 ? 4 : marginSpread > 20 ? 3 : 2;
     
-    if (highMarginProducts.length > 0 || lowMarginProducts.length > 0) {
       // Prepare metrics for priority calculation
       const metrics = {
         urgency: urgencyScore,
@@ -714,11 +812,12 @@ function generateActionableInsights(data: any) {
       
       const recommendation = getContextualRecommendation('productMix', productData, metrics);
       
-      insights.push({
+    insights.push({
         ...recommendation,
-        icon: <ShoppingBasket className="h-5 w-5 text-blue-500" />,
-        category: "Product Management",
-        timeframe: marginSpread > 40 ? "short-term" : "medium-term"
+      icon: <ShoppingBasket className="h-5 w-5 text-blue-500" />,
+        category: "Product",
+        timeframe: marginSpread > 40 ? "short-term" : "medium-term",
+        severity: severity
       });
     }
   }
@@ -732,6 +831,18 @@ function generateActionableInsights(data: any) {
     const top3Revenue = top3Locations.reduce((sum, c) => sum + c.revenue, 0);
     const totalRevenue = topLocations.reduce((sum, c) => sum + c.revenue, 0);
     const concentrationRatio = top3Revenue / totalRevenue;
+    
+    // Determine severity based on concentration ratio
+    let severity = "medium";
+    if (concentrationRatio > 0.8) {
+      severity = "critical";
+    } else if (concentrationRatio > 0.6) {
+      severity = "high";
+    } else if (concentrationRatio > 0.4) {
+      severity = "medium";
+    } else {
+      severity = "low";
+    }
     
     // Prepare metrics for priority calculation
     const metrics = {
@@ -752,12 +863,13 @@ function generateActionableInsights(data: any) {
     };
     
     const recommendation = getContextualRecommendation('locationRetention', locationData, metrics);
-    
+      
     insights.push({
       ...recommendation,
       icon: <Users className="h-5 w-5 text-blue-500" />,
-      category: "Regional Strategy",
-      timeframe: concentrationRatio > 0.8 ? "short-term" : "medium-term"
+      category: "Regional",
+      timeframe: concentrationRatio > 0.8 ? "short-term" : "medium-term",
+      severity: severity
     });
 
     // Add location diversification insight if top location has much higher revenue
@@ -766,7 +878,18 @@ function generateActionableInsights(data: any) {
       const top1Percent = top1Revenue / totalRevenue;
       const percentDifference = ((topLocations[0].revenue - topLocations[1].revenue) / topLocations[1].revenue) * 100;
       
+      // Only suggest diversification if there's a significant concentration
       if (top1Percent > 0.25 || percentDifference > 50) {
+        // Determine severity based on concentration
+        let divSeverity = "medium";
+        if (top1Percent > 0.5) {
+          divSeverity = "high";
+        } else if (top1Percent > 0.3) {
+          divSeverity = "medium";
+        } else {
+          divSeverity = "low";
+        }
+        
         // Calculate priority
         const divMetrics = {
           urgency: top1Percent > 0.5 ? 5 : top1Percent > 0.3 ? 4 : 3,
@@ -791,8 +914,9 @@ function generateActionableInsights(data: any) {
         insights.push({
           ...divRecommendation,
           icon: <CircleAlert className="h-5 w-5 text-blue-500" />,
-          category: "Regional Strategy",
-          timeframe: top1Percent > 0.5 ? "short-term" : "long-term"
+          category: "Regional",
+          timeframe: top1Percent > 0.5 ? "short-term" : "long-term",
+          severity: divSeverity
         });
       }
     }
@@ -804,7 +928,7 @@ function generateActionableInsights(data: any) {
     const monthFormat = data.revenue_data[0].month.includes('/') ? 'mm/yyyy' : 'month';
     
     // Extract month names only
-    const revenueByMonth = data.revenue_data.map(item => {
+    const revenueByMonth = data.revenue_data.map((item: any) => {
       let month = item.month;
       if (monthFormat === 'mm/yyyy') {
         month = item.month.split('/')[0];
@@ -816,8 +940,8 @@ function generateActionableInsights(data: any) {
     });
     
     // Group by month (in case we have multiple years)
-    const monthlyAvg = {};
-    revenueByMonth.forEach(item => {
+    const monthlyAvg: Record<string, { total: number; count: number }> = {};
+    revenueByMonth.forEach((item: any) => {
       if (!monthlyAvg[item.shortMonth]) {
         monthlyAvg[item.shortMonth] = { total: 0, count: 0 };
       }
@@ -847,6 +971,16 @@ function generateActionableInsights(data: any) {
       const troughVariance = avgRevenue / minRevenueMonth.revenue;
       const seasonalityStrength = (peakVariance + troughVariance) / 2;
       
+      // Determine severity based on seasonality strength
+      let severity = "medium";
+      if (seasonalityStrength > 2.5) {
+        severity = "high";
+      } else if (seasonalityStrength > 1.5) {
+        severity = "medium";
+      } else {
+        severity = "low";
+      }
+      
       // Prepare metrics for priority calculation
       const metrics = {
         urgency: seasonalityStrength > 2 ? 4 : seasonalityStrength > 1.5 ? 3 : 2,
@@ -875,7 +1009,8 @@ function generateActionableInsights(data: any) {
         ...recommendation,
         icon: <BarChart4 className="h-5 w-5 text-purple-500" />,
         category: "Planning",
-        timeframe: seasonalityStrength > 2 ? "short-term" : "medium-term"
+        timeframe: seasonalityStrength > 2 ? "short-term" : "medium-term",
+        severity: severity
       });
     }
   }
@@ -883,59 +1018,337 @@ function generateActionableInsights(data: any) {
   return insights;
 }
 
-export default function InsightsPage() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState("")
-  const [productInsights, setProductInsights] = useState<any[]>([])
-  const [customerInsights, setCustomerInsights] = useState<any[]>([])
-  const [actionableInsights, setActionableInsights] = useState<any[]>([])
-  const [insightMetrics, setInsightMetrics] = useState({ critical: 0, high: 0, medium: 0, low: 0 })
-  const [mostUrgentInsight, setMostUrgentInsight] = useState<any>(null)
-  const [selectedInsight, setSelectedInsight] = useState<any>(null)
-  const [showInsightDetails, setShowInsightDetails] = useState(false)
+// Updated to be more data-driven with no invented metrics
+function getDetailedAnalysis(insight: any): string {
+  if (!insight) return '';
   
-  useEffect(() => {
-    const fetchInsights = async () => {
-      setIsLoading(true)
-      try {
-        const data = await getDashboardData()
-        
-        // Generate insights from data
-        const insights = generateActionableInsights(data)
-        setActionableInsights(insights)
-        
-        // Calculate metrics
-        const critical = insights.filter(i => mapPriorityToSeverity(i.priority) === 'critical').length
-        const high = insights.filter(i => mapPriorityToSeverity(i.priority) === 'high').length
-        const medium = insights.filter(i => mapPriorityToSeverity(i.priority) === 'medium').length
-        const low = insights.filter(i => mapPriorityToSeverity(i.priority) === 'low').length
-        
-        setInsightMetrics({
-          critical,
-          high,
-          medium,
-          low
-        })
-        
-        // Find most urgent insight (highest priority)
-        if (insights.length > 0) {
-          const mostUrgent = [...insights].sort((a, b) => b.priority - a.priority)[0]
-          setMostUrgentInsight(mostUrgent)
-        }
-      } catch (e) {
-        console.error("Error fetching dashboard data:", e)
-        setError("Failed to fetch insights. Please try again later.")
-      } finally {
-        setIsLoading(false)
+  // Generate detailed analysis based on insight category and available metrics
+  if (insight.category === "Regional Strategy") {
+    if (!insight.metrics) return 'Analysis requires location data.';
+    
+    const topLocationText = insight.metrics.topLocationRevenue || 'significant percentage';
+    const locationCount = insight.metrics.locationCount || 'few';
+    
+    return `Your business shows ${insight.metrics.concentration ? `a ${insight.metrics.concentration} concentration` : 'a concentration'} with ${topLocationText} of revenue coming from ${locationCount} locations. This analysis is based on actual location revenue data, showing the relative importance of different regions to your business.`;
+  } 
+  else if (insight.category === "Revenue Trend") {
+    if (!insight.metrics) return 'Analysis requires revenue trend data.';
+    
+    if (insight.type === "destructive" || insight.type === "warning") {
+      const declineRate = insight.metrics.declineRate || 'a significant';
+      return `Your revenue has declined by ${declineRate} over the analyzed period. This assessment is based on actual month-to-month revenue data showing a consistent downward trend that requires attention.`;
+    } else {
+      const growthRate = insight.metrics.growthRate || 'a positive';
+      return `Your business is experiencing positive growth momentum with ${growthRate} increase in revenue. This assessment is based on actual month-to-month revenue data showing a consistent upward trend.`;
+    }
+  } 
+  else if (insight.category === "Product Management") {
+    if (!insight.metrics) return 'Analysis requires product margin data.';
+    
+    const marginSpread = insight.metrics.marginSpread || 'a significant';
+    return `Your product portfolio shows a profit margin spread of ${marginSpread}, indicating opportunities for optimization. This assessment is based on actual profit margin data across your product lines, revealing significant differences in profitability.`;
+  } 
+  else if (insight.category === "Planning") {
+    if (!insight.metrics) return 'Analysis requires seasonal revenue data.';
+    
+    const peakMonth = insight.metrics.peakMonth || 'certain periods';
+    const troughMonth = insight.metrics.troughMonth || 'other periods';
+    const seasonalityStrength = insight.metrics.seasonalityStrength || 'notable';
+    
+    return `Your business shows seasonal patterns with peak performance in ${peakMonth} and lower performance in ${troughMonth}. The seasonality strength is ${seasonalityStrength}. This assessment is based on actual monthly revenue data, revealing clear seasonal patterns in your business.`;
+  } 
+  else {
+    return `This insight is based on analysis of your business data, revealing an opportunity that warrants attention.`;
+  }
+}
+
+// Update the getInsightKPIs function to be data-driven
+function getInsightKPIs(insight: any) {
+  if (!insight || !insight.metrics) return [];
+  
+  // Generate KPIs based on insight category and available metrics
+  if (insight.category === "Regional Strategy") {
+    const kpis = [];
+    
+    if (insight.metrics.topLocationRevenue) {
+      kpis.push({ 
+        name: "Location Revenue Concentration", 
+        current: insight.metrics.topLocationRevenue, 
+        target: parseFloat(insight.metrics.topLocationRevenue) > 60 ? "Below 60%" : "Maintain current level" 
+      });
+    }
+    
+    if (insight.metrics.locationCount) {
+      kpis.push({ 
+        name: "Key Location Count", 
+        current: insight.metrics.locationCount.toString(), 
+        target: "Maintain focus on key locations" 
+      });
+    }
+    
+    if (insight.metrics.concentration) {
+      kpis.push({ 
+        name: "Top Location Concentration", 
+        current: insight.metrics.concentration, 
+        target: parseFloat(insight.metrics.concentration) > 40 ? "Below 40%" : "Monitor for changes" 
+      });
+    }
+    
+    return kpis.length > 0 ? kpis : [
+      { name: "Location Strategy", current: "Review needed", target: "Data-driven strategy" }
+    ];
+  } 
+  else if (insight.category === "Revenue Trend") {
+    const kpis = [];
+    
+    if (insight.type === "destructive" || insight.type === "warning") {
+      if (insight.metrics.declineRate) {
+        kpis.push({ 
+          name: "Revenue Trend", 
+          current: `-${insight.metrics.declineRate} (declining)`, 
+          target: "Positive growth" 
+        });
+      }
+      
+      if (insight.metrics.monthlyAvgDecline) {
+        kpis.push({ 
+          name: "Monthly Decline Rate", 
+          current: insight.metrics.monthlyAvgDecline, 
+          target: "Reverse trend" 
+        });
+      }
+    } else {
+      if (insight.metrics.growthRate) {
+        kpis.push({ 
+          name: "Revenue Growth Rate", 
+          current: `+${insight.metrics.growthRate}`, 
+          target: "Sustain growth" 
+        });
+      }
+      
+      if (insight.metrics.monthlyAvgGrowth) {
+        kpis.push({ 
+          name: "Monthly Growth Rate", 
+          current: insight.metrics.monthlyAvgGrowth, 
+          target: "Maintain or increase" 
+        });
       }
     }
     
-    fetchInsights()
+    return kpis.length > 0 ? kpis : [
+      { name: "Revenue Performance", current: "Review needed", target: "Positive growth trend" }
+    ];
+  } 
+  else if (insight.category === "Product Management") {
+    const kpis = [];
+    
+    if (insight.metrics.marginSpread) {
+      kpis.push({ 
+        name: "Portfolio Profit Margin Spread", 
+        current: insight.metrics.marginSpread, 
+        target: "Reduce spread" 
+      });
+    }
+    
+    if (insight.metrics.revenueImpact) {
+      kpis.push({ 
+        name: "Revenue Impact", 
+        current: insight.metrics.revenueImpact, 
+        target: "Optimize mix" 
+      });
+    }
+    
+    return kpis.length > 0 ? kpis : [
+      { name: "Product Profitability", current: "Analysis needed", target: "Balanced portfolio" }
+    ];
+  } 
+  else if (insight.category === "Planning") {
+    const kpis = [];
+    
+    if (insight.metrics.seasonalityStrength) {
+      kpis.push({ 
+        name: "Seasonal Revenue Variation", 
+        current: insight.metrics.seasonalityStrength, 
+        target: parseFloat(insight.metrics.seasonalityStrength) > 1.5 ? "Below 1.5x" : "Monitor trends" 
+      });
+    }
+    
+    if (insight.metrics.peakMonth && insight.metrics.peakRevenue) {
+      kpis.push({ 
+        name: `Month ${insight.metrics.peakMonth} Performance`, 
+        current: insight.metrics.peakRevenue, 
+        target: "Optimize for peak" 
+      });
+    }
+    
+    if (insight.metrics.troughMonth && insight.metrics.troughRevenue) {
+      kpis.push({ 
+        name: `Month ${insight.metrics.troughMonth} Performance`, 
+        current: insight.metrics.troughRevenue, 
+        target: "Improve off-season" 
+      });
+    }
+    
+    return kpis.length > 0 ? kpis : [
+      { name: "Seasonal Planning", current: "Analysis needed", target: "Balanced performance" }
+    ];
+  } 
+  
+  // Fallback for any insight type with metrics
+  return Object.entries(insight.metrics).map(([key, value]: [string, any]) => {
+    // Format the key for display
+    const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').toLowerCase();
+    const capitalizedKey = formattedKey.charAt(0).toUpperCase() + formattedKey.slice(1);
+    
+    return {
+      name: capitalizedKey,
+      current: String(value),
+      target: "Optimize"
+    };
+  });
+}
+
+// Update the getDetailedImplementationSteps function to be data-driven
+function getDetailedImplementationSteps(insight: any) {
+  if (!insight) return [];
+  
+  // Generate implementation steps based solely on the available data
+  const baseSteps = [
+    { 
+      step: 1, 
+      action: "Analyze Current Data", 
+      details: `Review the metrics associated with this ${insight.category} insight to understand the current situation.`, 
+      timeframe: "Immediate (1 week)" 
+    },
+    { 
+      step: 2, 
+      action: "Identify Improvement Opportunities", 
+      details: "Based on the data analysis, identify specific areas where improvements can be made.", 
+      timeframe: "Short-term (2 weeks)" 
+    },
+    { 
+      step: 3, 
+      action: "Develop Action Plan", 
+      details: "Create a targeted plan to address the identified opportunities with clear ownership and timeline.", 
+      timeframe: "Short-term (3-4 weeks)" 
+    },
+    { 
+      step: 4, 
+      action: "Implement and Monitor", 
+      details: "Execute the action plan and establish metrics to track progress and impact.", 
+      timeframe: "Ongoing" 
+    }
+  ];
+  
+  // For insights with specific metrics, add more contextual steps
+  if (insight.category === "Regional Strategy" && insight.metrics) {
+    if (insight.metrics.topLocationRevenue) {
+      const concentration = parseFloat(insight.metrics.topLocationRevenue);
+      if (concentration > 70) {
+        baseSteps[1] = {
+          step: 2,
+          action: "Diversification Planning",
+          details: `With ${insight.metrics.topLocationRevenue} of revenue concentrated in top locations, develop strategies to expand into new regions.`,
+          timeframe: "Short-term (2-4 weeks)"
+        };
+      }
+    }
+  }
+  else if (insight.category === "Revenue Trend" && insight.metrics) {
+    if (insight.type === "destructive" || insight.type === "warning") {
+      if (insight.metrics.declineRate) {
+        baseSteps[1] = {
+          step: 2,
+          action: "Revenue Recovery Planning",
+          details: `With a decline of ${insight.metrics.declineRate}, identify and address the key factors contributing to the revenue decline.`,
+          timeframe: "Immediate (1-2 weeks)"
+        };
+      }
+    } else if (insight.metrics.growthRate) {
+      baseSteps[1] = {
+        step: 2,
+        action: "Growth Acceleration",
+        details: `With growth of ${insight.metrics.growthRate}, identify factors driving success and develop plans to build on this momentum.`,
+        timeframe: "Short-term (2-3 weeks)"
+      };
+    }
+  }
+  else if (insight.category === "Product Management" && insight.metrics) {
+    if (insight.metrics.marginSpread) {
+      baseSteps[1] = {
+        step: 2,
+        action: "Portfolio Optimization",
+        details: `With a margin spread of ${insight.metrics.marginSpread}, identify strategies to improve profitability of lower-margin products.`,
+        timeframe: "Short-term (2-4 weeks)"
+      };
+    }
+  }
+  else if (insight.category === "Planning" && insight.metrics) {
+    if (insight.metrics.seasonalityStrength && insight.metrics.peakMonth && insight.metrics.troughMonth) {
+      baseSteps[1] = {
+        step: 2,
+        action: "Seasonal Strategy Development",
+        details: `With a seasonality strength of ${insight.metrics.seasonalityStrength}x between peak month ${insight.metrics.peakMonth} and low month ${insight.metrics.troughMonth}, develop strategies to optimize across seasons.`,
+        timeframe: "Short-term (2-4 weeks)"
+      };
+    }
+  }
+  
+  return baseSteps;
+}
+
+export default function InsightsPage() {
+  const [insights, setInsights] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedInsight, setSelectedInsight] = useState<any>(null);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState("all");
+  
+  // Get the most urgent insight for featuring
+  const getFeaturedInsight = () => {
+    if (insights.length === 0) return null;
+    
+    // First try to find a critical insight
+    const criticalInsight = insights.find(i => i.severity === "critical");
+    if (criticalInsight) return criticalInsight;
+    
+    // Then try to find a high priority insight
+    const highInsight = insights.find(i => i.severity === "high");
+    if (highInsight) return highInsight;
+    
+    // Otherwise use the first insight
+    return insights[0];
+  };
+  
+  useEffect(() => {
+    const fetchInsights = async () => {
+      setLoading(true);
+      try {
+        const data = await getDashboardData();
+        
+        // Generate the insights based on the dashboard data
+        const generatedInsights = generateActionableInsights(data);
+        
+        console.log("Generated insights:", generatedInsights);
+        
+        setInsights(generatedInsights);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching insights:", err);
+        setError("Failed to load insights. Please try again later.");
+        setInsights([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchInsights();
     
     // Listen for data file changes from other parts of the app
     const handleDataFileChanged = (event: Event) => {
-      console.log("Data file changed event received in insights page");
-      // Reload insights when data file changes
+      console.log("Data file changed event received in insights");
+      // Reload insights when file changes
       fetchInsights();
     };
     
@@ -946,366 +1359,294 @@ export default function InsightsPage() {
     return () => {
       window.removeEventListener('dataFileChanged', handleDataFileChanged);
     };
-  }, [])
+  }, []);
 
-  // Helper function to get color based on severity/type
-  const getSeverityColor = (insight) => {
-    if (insight.severityLevel === 'critical' || insight.type === 'destructive') {
-      return 'bg-red-50 border-red-200'
-    } else if (insight.severityLevel === 'high' || insight.type === 'warning') {
-      return 'bg-amber-50 border-amber-200'
-    } else if (insight.severityLevel === 'medium' || insight.type === 'success') {
-      return 'bg-green-50 border-green-200'
-    } else {
-      return 'bg-blue-50 border-blue-200'
-    }
-  }
+  // Determine severity color
+  const getSeverityColor = (insight: any): string => {
+    const severity = insight.severity || "medium";
+    const colorMap: Record<string, string> = {
+      critical: "bg-red-500",
+      high: "bg-orange-500",
+      medium: "bg-yellow-500",
+      low: "bg-green-500"
+    };
+    return colorMap[severity as keyof typeof colorMap] || "bg-blue-500";
+  };
 
-  // Render an insight card with appropriate styling
-  const renderInsightCard = (insight, index, isFeatured = false) => {
+  // Render an insight card
+  const renderInsightCard = (insight: any, index: string | number, isFeatured = false) => {
+    const severityColor = getSeverityColor(insight);
+    const urgencyClass = insight.severity === "critical" ? 
+      'bg-gradient-to-br from-red-50 to-red-100 border-red-200' : 
+      insight.severity === "high" ? 
+        'bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200' : 
+        isFeatured ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200' : '';
+    
     return (
       <Card 
         key={index} 
-        className={`${getSeverityColor(insight)} ${isFeatured ? 'border-2' : ''}`}
+        className={`${isFeatured ? 'col-span-1 md:col-span-2 lg:col-span-3' : ''} h-full flex flex-col ${urgencyClass}`}
       >
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <div className="flex items-center gap-2">
-            {insight.icon}
-            <div>
-              <CardTitle className="text-lg flex items-center gap-2">
-                {insight.recommendation || insight.title}
-                {insight.priority && !isFeatured && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${getBadgeColor(mapPriorityToSeverity(insight.priority))}`}>
-                    {mapPriorityToSeverity(insight.priority)}
-                  </span>
-                )}
-              </CardTitle>
-              {insight.category && (
-                <div className="flex items-center mt-1 text-xs text-muted-foreground">
-                  <span className="mr-3">{insight.category}</span>
-                  {insight.timeframe && (
-                    <span className="px-1.5 py-0.5 bg-muted rounded-full">{insight.timeframe}</span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          {isFeatured && insight.priority && (
-            <span className={`text-xs px-3 py-1 rounded-full font-medium ${getBadgeColor(mapPriorityToSeverity(insight.priority))}`}>
-              {mapPriorityToSeverity(insight.priority) === 'critical' ? 'URGENT' : mapPriorityToSeverity(insight.priority).toUpperCase()}
-            </span>
-          )}
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex items-start justify-between">
+            <div className="flex flex-col space-y-2">
+              <div className="flex items-center space-x-2">
+                {insight.icon ? 
+                  React.cloneElement(insight.icon, { className: "h-5 w-5 text-muted-foreground" }) :
+                  <BarChart4 className="h-5 w-5 text-muted-foreground" />
+                }
+                <Badge 
+                  variant="outline" 
+                  className={`text-white ${severityColor} text-xs`}
+                >
+                  {insight.severity || "Medium"}
+                </Badge>
+              </div>
+                    {insight.category && (
+                <Badge variant="secondary" className="text-xs w-fit">
+                  {insight.category}
+                </Badge>
+                        )}
+                      </div>
+                  </div>
+          <CardTitle className="text-base sm:text-lg mt-2">{insight.title}</CardTitle>
+          <CardDescription className="text-xs sm:text-sm line-clamp-2">
+            {insight.description}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <CardDescription className="text-base">{insight.description}</CardDescription>
-          
-          {/* Display metrics in a more structured format */}
-          {insight.metrics && Object.keys(insight.metrics).length > 0 && (
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {Object.entries(insight.metrics).map(([key, value]) => (
-                <div key={key} className="flex flex-col">
-                  <span className="text-xs text-muted-foreground capitalize">{key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').toLowerCase()}</span>
-                  <span className="font-medium">{value}</span>
+        <CardContent className="flex-grow p-4 sm:p-6 pt-0 sm:pt-0">
+          <div className="space-y-2 text-sm">
+            {insight.metrics && Array.isArray(insight.metrics) && insight.metrics.map((metric: any, i: number) => (
+              <div key={i} className="flex flex-col space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span>{metric.label}</span>
+                  <span className="font-medium">{metric.value}</span>
+          </div>
+                {metric.progress !== undefined && (
+                  <Progress value={metric.progress as number} className="h-1" />
+                )}
                 </div>
               ))}
+            {insight.metrics && !Array.isArray(insight.metrics) && Object.entries(insight.metrics).map(([label, value]: [string, any], i: number) => (
+              <div key={`${label}-${i}`} className="flex flex-col space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span>{label}</span>
+                  <span className="font-medium">{String(value)}</span>
             </div>
-          )}
-          
-          {/* Display recommended actions if available */}
-          {insight.actions && insight.actions.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <h4 className="text-sm font-medium mb-2">Recommended Actions:</h4>
-              <ul className="text-sm space-y-2">
-                {insight.actions.slice(0, 2).map((action, i) => (
-                  <li key={i} className="flex items-start">
-                    <div className="h-5 w-5 mr-2 flex items-center justify-center flex-shrink-0">
-                      <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
                     </div>
-                    <span>{action}</span>
-                  </li>
-                ))}
-                {insight.actions.length > 2 && (
-                  <li className="text-xs text-muted-foreground pl-7">
-                    +{insight.actions.length - 2} more actions
-                  </li>
-                )}
-              </ul>
+            ))}
             </div>
-          )}
-          
-          <div className="mt-4 flex justify-end space-x-2">
+        </CardContent>
+        <CardFooter className="border-t p-4 sm:p-6">
+          <div className="w-full">
             <Button 
-              size="sm" 
               variant="outline"
+              className="w-full text-xs sm:text-sm h-8 sm:h-9"
               onClick={() => {
                 setSelectedInsight(insight);
-                setShowInsightDetails(true);
+                setShowDetailDialog(true);
               }}
             >
-              View Details
+              View Details & Recommendations
             </Button>
-            {insight.source === 'action' && (
-              <Button size="sm" variant="default">
-                Take Action
-              </Button>
-            )}
           </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  // Add a function to generate more detailed analysis text based on insight type
-  const getDetailedAnalysis = (insight) => {
-    if (!insight) return '';
-    
-    const severityLevel = mapPriorityToSeverity(insight.priority);
-    
-    let analysis = '';
-    
-    // Generate detailed analysis based on insight category
-    if (insight.category === "Regional Strategy") {
-      const locationText = insight.locations ? insight.locations.join(", ") : "your top locations";
-      if (insight.concentrationRatio > 0.7) {
-        analysis = `Your business shows a significant concentration risk with ${insight.metrics?.topLocationRevenue || '60%+'} of revenue coming from just ${insight.metrics?.locationCount || 'a few'} locations. This creates vulnerability if market conditions change in these regions. The recommendation focuses on maintaining these key revenue sources while strategically expanding your geographic footprint.`;
-      } else if (insight.concentrationRatio > 0.5) {
-        analysis = `Your business has a moderate concentration with ${insight.metrics?.topLocationRevenue || '50-60%'} of revenue from ${insight.metrics?.locationCount || 'a few'} locations. While not critical, this suggests an opportunity to expand your geographic reach while maintaining strong relationships with ${locationText}.`;
-      } else {
-        analysis = `Your business has a relatively balanced geographic distribution with ${insight.metrics?.topLocationRevenue || 'less than 50%'} of revenue from your top locations. The recommendation focuses on optimizing your regional strategy to maintain this balance while maximizing growth.`;
-      }
-    } else if (insight.category === "Revenue Growth") {
-      if (insight.type === "destructive" || insight.type === "warning") {
-        analysis = `Your revenue has declined by ${insight.metrics?.declineRate || 'a significant amount'} over the analyzed period. This consistent downward trend requires ${severityLevel === 'critical' ? 'immediate intervention' : 'attention'} to identify and address the root causes. The recommendation focuses on stopping the decline and rebuilding momentum.`;
-      } else {
-        analysis = `Your business is experiencing positive growth momentum with a ${insight.metrics?.growthRate || 'significant'} increase in revenue. The recommendation focuses on strategies to capitalize on and sustain this growth trajectory.`;
-      }
-    } else if (insight.category === "Product Management") {
-      analysis = `Your product portfolio shows a profit margin spread of ${insight.metrics?.marginSpread || 'significant variation'}, indicating opportunities for optimization. Your highest margin products (${insight.highMarginProducts?.join(", ") || 'top performers'}) significantly outperform your lowest margin products (${insight.lowMarginProducts?.join(", ") || 'underperformers'}). The recommendation focuses on strategically rebalancing your product mix.`;
-    } else if (insight.category === "Planning") {
-      analysis = `Your business shows seasonal patterns with peak performance in ${insight.metrics?.peakMonth || 'certain periods'} and lower performance in ${insight.metrics?.troughMonth || 'other periods'}. The seasonality strength is ${insight.metrics?.seasonalityStrength || 'notable'}, requiring strategic planning to maximize opportunities and minimize downtime.`;
-    } else {
-      analysis = `This ${severityLevel} priority insight identifies an important opportunity for your business. The recommended actions provide a structured approach to address this opportunity.`;
-    }
-    
-    return analysis;
-  }
-
-  // Add a function to generate example KPIs for the insight
-  const getInsightKPIs = (insight) => {
-    if (!insight) return [];
-    
-    // Generate KPIs based on insight category
-    if (insight.category === "Regional Strategy") {
-      return [
-        { name: "Location Revenue Concentration", current: insight.metrics?.topLocationRevenue || "60.3%", target: "Below 50%" },
-        { name: "Geographic Expansion Rate", current: "0 new regions/quarter", target: "1-2 new regions/quarter" },
-        { name: "Secondary Location Growth", current: "3% YoY", target: "10% YoY" }
-      ];
-    } else if (insight.category === "Revenue Growth") {
-      if (insight.type === "destructive" || insight.type === "warning") {
-        return [
-          { name: "Revenue Trend", current: `-${insight.metrics?.declineRate || "5%"} (declining)`, target: "Positive growth" },
-          { name: "Customer Retention Rate", current: "82%", target: "90%+" },
-          { name: "Sales Conversion Rate", current: "18%", target: "25%" }
-        ];
-      } else {
-        return [
-          { name: "Revenue Growth Rate", current: `+${insight.metrics?.growthRate || "12%"}`, target: "Sustain >10%" },
-          { name: "Market Share", current: "14%", target: "20%" },
-          { name: "Customer Acquisition Cost", current: "$850", target: "Maintain or reduce" }
-        ];
-      }
-    } else if (insight.category === "Product Management") {
-      return [
-        { name: "Portfolio Profit Margin Spread", current: insight.metrics?.marginSpread || "25%", target: "Below 15%" },
-        { name: "High-Margin Product Revenue", current: "30% of total", target: "50% of total" },
-        { name: "Low-Margin Product Profitability", current: "5% margin", target: "15% margin or discontinue" }
-      ];
-    } else if (insight.category === "Planning") {
-      return [
-        { name: "Seasonal Revenue Variation", current: insight.metrics?.seasonalityStrength || "2.5x", target: "Below 2x" },
-        { name: "Off-Season Capacity Utilization", current: "60%", target: "80%" },
-        { name: "Peak Season Fulfillment Rate", current: "92%", target: "98%" }
-      ];
-    } else {
-      return [
-        { name: "Implementation Rate", current: "0%", target: "100%" },
-        { name: "Time to Value", current: "N/A", target: "90 days" }
-      ];
-    }
-  }
-
-  // Add a function to generate detailed implementation steps
-  const getDetailedImplementationSteps = (insight) => {
-    if (!insight || !insight.actions) return [];
-    
-    // Map each action to a more detailed step
-    return insight.actions.map((action, index) => {
-      // Generate a more detailed description based on the action
-      let details = '';
-      
-      // These are examples - in a real application, you might have predefined detailed steps
-      if (action.toLowerCase().includes('expansion')) {
-        details = 'Conduct market research to identify 3-5 high-potential regions, develop region-specific marketing plans, and allocate resources for targeted expansion.';
-      } else if (action.toLowerCase().includes('monitoring')) {
-        details = 'Implement weekly KPI tracking dashboards, establish alert thresholds, and assign ownership for regular review and response protocols.';
-      } else if (action.toLowerCase().includes('analysis') || action.toLowerCase().includes('audit')) {
-        details = 'Gather relevant data from the past 12 months, conduct thorough analysis using standardized frameworks, and document findings with specific opportunities.';
-      } else if (action.toLowerCase().includes('strategy')) {
-        details = 'Form a cross-functional team, conduct SWOT analysis, identify key strategic initiatives, and develop a phased implementation plan with clear metrics.';
-      } else if (action.toLowerCase().includes('pricing')) {
-        details = 'Analyze price elasticity by segment, benchmark against competitors, model impact of various pricing scenarios, and develop a controlled rollout plan.';
-      } else {
-        details = 'Establish clear ownership, timeline, and success metrics. Identify required resources and potential challenges. Create a specific implementation plan with milestones.';
-      }
-      
-      return {
-        step: index + 1,
-        action,
-        details,
-        timeframe: index === 0 ? 'Immediate (1-2 weeks)' : index === 1 ? 'Short-term (1-3 months)' : 'Medium-term (3-6 months)'
-      };
-    });
-  }
+        </CardFooter>
+              </Card>
+    );
+  };
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-2">Business Insights</h1>
-      <p className="text-muted-foreground mb-6">Data-driven recommendations to improve your business performance</p>
-
-      {isLoading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-[200px] w-full rounded-lg" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Skeleton className="h-[300px] w-full rounded-lg" />
-            <Skeleton className="h-[300px] w-full rounded-lg" />
-            <Skeleton className="h-[300px] w-full rounded-lg" />
+    <div className="container py-4 sm:py-6 md:py-8 px-2 sm:px-4 md:px-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-0">Business Insights</h1>
+          {!loading && (
+            <p className="text-sm text-muted-foreground">
+              {insights.length} {insights.length === 1 ? 'data-driven insight' : 'data-driven insights'} available
+            </p>
+          )}
           </div>
+        <Button 
+          variant="outline" 
+          disabled={loading} 
+          onClick={() => window.location.reload()}
+          className="self-start sm:self-auto text-xs sm:text-sm"
+        >
+          <RefreshCw className="mr-2 h-3 sm:h-4 w-3 sm:w-4" />
+          Refresh Insights
+        </Button>
         </div>
-      ) : error ? (
-        <Alert variant="destructive">
+
+      {error && (
+        <Alert variant="destructive" className="mb-4 sm:mb-6">
+          <CircleAlert className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>
-            {error}
-          </AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
+      )}
+
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="h-full">
+              <CardHeader>
+                <Skeleton className="h-6 w-1/3 mb-2" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3 mt-2" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-20 w-full" />
+              </CardContent>
+              <CardFooter>
+                <Skeleton className="h-9 w-full" />
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
       ) : (
-        <>
-          {/* Most Urgent Insight Section */}
-          {mostUrgentInsight && (
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <span className="h-2 w-2 rounded-full bg-red-500 mr-2"></span>
-                Most Urgent Action
-              </h2>
-              {renderInsightCard(mostUrgentInsight, 'urgent', true)}
-              <div className="mt-4 flex justify-end">
-                <Button variant="default" className="gap-2">
-                  Create Action Plan <ArrowUpRight size={16} />
-                </Button>
-              </div>
+        <div className="space-y-6">
+          {/* Featured Insight */}
+          {insights.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {renderInsightCard(getFeaturedInsight(), 0, true)}
             </div>
           )}
 
-          {/* Priority Indicators */}
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold mb-3">Priority Indicators</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Card className="p-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-red-500"></div>
-                  <h3 className="font-medium">Critical</h3>
+          {/* All Insights */}
+          <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
+            <div className="flex justify-between items-center mb-2 sm:mb-4">
+              <TabsList className="overflow-x-auto flex-nowrap whitespace-nowrap w-auto max-w-[calc(100vw-2rem)] sm:max-w-none">
+                <TabsTrigger value="all" className="text-xs sm:text-sm">All Insights</TabsTrigger>
+                <TabsTrigger value="critical" className="text-xs sm:text-sm">Critical</TabsTrigger>
+                <TabsTrigger value="high" className="text-xs sm:text-sm">High</TabsTrigger>
+                <TabsTrigger value="Revenue" className="text-xs sm:text-sm">Revenue</TabsTrigger>
+                <TabsTrigger value="Product" className="text-xs sm:text-sm">Product</TabsTrigger>
+                <TabsTrigger value="Regional" className="text-xs sm:text-sm">Regional</TabsTrigger>
+                <TabsTrigger value="Planning" className="text-xs sm:text-sm">Planning</TabsTrigger>
+                <TabsTrigger value="Pricing" className="text-xs sm:text-sm">Pricing</TabsTrigger>
+              </TabsList>
                 </div>
-                <p className="text-3xl font-bold mt-2">{insightMetrics.critical}</p>
-                <p className="text-xs text-muted-foreground mt-1">Require immediate attention</p>
-              </Card>
-              <Card className="p-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-amber-500"></div>
-                  <h3 className="font-medium">High</h3>
+            
+            <TabsContent value="all">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {insights.length > 0 ? (
+                  insights.filter(insight => insight !== getFeaturedInsight()).map((insight, index) => renderInsightCard(insight, `all-${index}`))
+                ) : (
+                  <div className="col-span-full text-center py-10">
+                    <p>No insights available. Try refreshing the data.</p>
                 </div>
-                <p className="text-3xl font-bold mt-2">{insightMetrics.high}</p>
-                <p className="text-xs text-muted-foreground mt-1">Important to address soon</p>
-              </Card>
-              <Card className="p-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-                  <h3 className="font-medium">Medium</h3>
+                )}
                 </div>
-                <p className="text-3xl font-bold mt-2">{insightMetrics.medium}</p>
-                <p className="text-xs text-muted-foreground mt-1">Plan to address these</p>
-              </Card>
-              <Card className="p-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-green-500"></div>
-                  <h3 className="font-medium">Low</h3>
-                </div>
-                <p className="text-3xl font-bold mt-2">{insightMetrics.low}</p>
-                <p className="text-xs text-muted-foreground mt-1">Monitor periodically</p>
-              </Card>
-            </div>
-          </div>
+            </TabsContent>
 
-          {/* Category Tabs - Sort actionableInsights by priority within each category */}
-          <Tabs defaultValue="all" className="mt-8">
-            <TabsList className="mb-4">
-              <TabsTrigger value="all">All Insights</TabsTrigger>
-              <TabsTrigger value="revenue">Revenue</TabsTrigger>
-              <TabsTrigger value="products">Products</TabsTrigger>
-              <TabsTrigger value="locations">Locations</TabsTrigger>
-              <TabsTrigger value="operations">Operations</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="all" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {actionableInsights.map((insight, index) => renderInsightCard(insight, index))}
+            <TabsContent value="critical">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {insights.filter(i => i.severity === "critical").length > 0 ? (
+                  insights.filter(i => i.severity === "critical").map((insight, index) => renderInsightCard(insight, `critical-${index}`))
+                ) : (
+                  <div className="col-span-full text-center py-10">
+                    <p>No critical insights found. That's good news!</p>
+                </div>
+                )}
+            </div>
             </TabsContent>
             
-            <TabsContent value="revenue" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {actionableInsights
-                .filter(insight => insight.category === "Revenue Growth" || insight.category === "Pricing Strategy")
-                .sort((a, b) => b.priority - a.priority)
-                .map((insight, index) => renderInsightCard(insight, index))}
+            <TabsContent value="high">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {insights.filter(i => i.severity === "high").length > 0 ? (
+                  insights.filter(i => i.severity === "high").map((insight, index) => renderInsightCard(insight, `high-${index}`))
+                ) : (
+                  <div className="col-span-full text-center py-10">
+                    <p>No high priority insights found.</p>
+          </div>
+                )}
+              </div>
             </TabsContent>
             
-            <TabsContent value="products" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {actionableInsights
-                .filter(insight => insight.category === "Product Management" || insight.category === "Inventory Management")
-                .sort((a, b) => b.priority - a.priority)
-                .map((insight, index) => renderInsightCard(insight, index))}
+            <TabsContent value="Revenue">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {insights.filter(i => i.category === "Revenue").length > 0 ? (
+                  insights.filter(i => i.category === "Revenue").map((insight, index) => renderInsightCard(insight, `revenue-${index}`))
+                ) : (
+                  <div className="col-span-full text-center py-10">
+                    <p>No revenue insights available.</p>
+                  </div>
+                )}
+              </div>
             </TabsContent>
             
-            <TabsContent value="locations" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {actionableInsights
-                .filter(insight => insight.category === "Regional Strategy")
-                .sort((a, b) => b.priority - a.priority)
-                .map((insight, index) => renderInsightCard(insight, index))}
+            <TabsContent value="Product">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {insights.filter(i => i.category === "Product").length > 0 ? (
+                  insights.filter(i => i.category === "Product").map((insight, index) => renderInsightCard(insight, `product-${index}`))
+                ) : (
+                  <div className="col-span-full text-center py-10">
+                    <p>No product insights available.</p>
+                  </div>
+                )}
+              </div>
             </TabsContent>
             
-            <TabsContent value="operations" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {actionableInsights
-                .filter(insight => insight.category === "Planning" || insight.category === "Operations")
-                .sort((a, b) => b.priority - a.priority)
-                .map((insight, index) => renderInsightCard(insight, index))}
+            <TabsContent value="Regional">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {insights.filter(i => i.category === "Regional").length > 0 ? (
+                  insights.filter(i => i.category === "Regional").map((insight, index) => renderInsightCard(insight, `regional-${index}`))
+                ) : (
+                  <div className="col-span-full text-center py-10">
+                    <p>No regional insights available.</p>
+                  </div>
+                )}
+              </div>
             </TabsContent>
-          </Tabs>
-        </>
+            
+            <TabsContent value="Planning">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {insights.filter(i => i.category === "Planning").length > 0 ? (
+                  insights.filter(i => i.category === "Planning").map((insight, index) => renderInsightCard(insight, `planning-${index}`))
+                ) : (
+                  <div className="col-span-full text-center py-10">
+                    <p>No planning insights available.</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="Pricing">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {insights.filter(i => i.category === "Pricing").length > 0 ? (
+                  insights.filter(i => i.category === "Pricing").map((insight, index) => renderInsightCard(insight, `pricing-${index}`))
+                ) : (
+                  <div className="col-span-full text-center py-10">
+                    <p>No pricing insights available.</p>
+                  </div>
+                )}
+              </div>
+        </TabsContent>
+      </Tabs>
+        </div>
       )}
 
-      <Dialog open={showInsightDetails} onOpenChange={setShowInsightDetails}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      {/* Insight Detail Dialog */}
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent className="w-[90vw] max-w-full sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[90vh] sm:max-h-[80vh] overflow-y-auto">
           {selectedInsight && (
             <>
               <DialogHeader>
-                <div className="flex items-center gap-2">
-                  {selectedInsight.icon}
-                  <DialogTitle className="text-xl">{selectedInsight.recommendation || selectedInsight.title}</DialogTitle>
-                </div>
-                <div className="flex items-center mt-1 gap-2">
-                  <span className={`px-2 py-0.5 rounded-full text-xs ${getBadgeColor(mapPriorityToSeverity(selectedInsight.priority))}`}>
-                    {mapPriorityToSeverity(selectedInsight.priority)}
+                <div className="flex items-center space-x-2 mb-2">
+                  <Badge 
+                    variant="outline" 
+                    className={`text-white ${getSeverityColor(selectedInsight)} text-xs`}
+                  >
+                    {selectedInsight.severity || "Medium"}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {selectedInsight.category} insight
                   </span>
-                  <DialogDescription className="mt-0">{selectedInsight.category} • {selectedInsight.timeframe}</DialogDescription>
                 </div>
+                <DialogTitle className="text-xl">{selectedInsight.title}</DialogTitle>
+                <DialogDescription className="text-sm">
+                  {selectedInsight.description}
+                </DialogDescription>
               </DialogHeader>
               
               <div className="py-4 space-y-6">
@@ -1326,10 +1667,10 @@ export default function InsightsPage() {
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Key Metrics</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      {Object.entries(selectedInsight.metrics).map(([key, value]) => (
-                        <div key={key} className="bg-muted p-3 rounded-lg">
+                      {Object.entries(selectedInsight.metrics).map(([key, value]: [string, any], i: number) => (
+                        <div key={`${key}-${i}`} className="bg-muted p-3 rounded-lg">
                           <div className="text-xs text-muted-foreground capitalize">{key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').toLowerCase()}</div>
-                          <div className="text-lg font-semibold">{value}</div>
+                          <div className="text-lg font-semibold">{String(value)}</div>
                         </div>
                       ))}
                     </div>
@@ -1401,7 +1742,7 @@ export default function InsightsPage() {
                 <div className="text-xs text-muted-foreground">
                   Priority score: {selectedInsight.priority}/5 • Generated based on your business data
                 </div>
-                <Button onClick={() => setShowInsightDetails(false)}>Close</Button>
+                <Button onClick={() => setShowDetailDialog(false)}>Close</Button>
               </DialogFooter>
             </>
           )}

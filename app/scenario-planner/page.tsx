@@ -375,11 +375,11 @@ export default function ScenarioPlannerPage() {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-4xl font-bold mb-8">Scenario Planner</h1>
+    <div className="container mx-auto py-4 sm:py-6 md:py-8 px-2 sm:px-4 md:px-6">
+      <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 md:mb-8">Scenario Planner</h1>
 
       {error && (
-        <Alert variant="destructive" className="mb-6">
+        <Alert variant="destructive" className="mb-4 sm:mb-6">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
@@ -387,35 +387,35 @@ export default function ScenarioPlannerPage() {
       )}
 
       <div className="flex justify-end mb-4">
-        <Button variant="outline" onClick={reloadProductData} disabled={isLoading}>
+        <Button variant="outline" onClick={reloadProductData} disabled={isLoading} className="text-xs sm:text-sm">
           Reload Product Data
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Scenario Parameters</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">Scenario Parameters</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Adjust the parameters to simulate different business scenarios. Our AI will
               predict the quantity that will be sold.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="locationId">Location</Label>
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+            <div className="grid gap-3 sm:gap-4">
+              <div className="grid gap-1 sm:gap-2">
+                <Label htmlFor="locationId" className="text-xs sm:text-sm">Location</Label>
                 <Select
                   value={simulatedScenario.locationId}
                   onValueChange={(value) => handleSelectChange("locationId", value)}
                   disabled={isLoadingOptions}
                 >
-                  <SelectTrigger id="locationId">
+                  <SelectTrigger id="locationId" className="text-xs sm:text-sm h-8 sm:h-10">
                     <SelectValue placeholder="Select a location" />
                   </SelectTrigger>
                   <SelectContent>
                     {locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>
+                      <SelectItem key={location.id} value={location.id} className="text-xs sm:text-sm">
                         {location.name}
                       </SelectItem>
                     ))}
@@ -423,19 +423,19 @@ export default function ScenarioPlannerPage() {
                 </Select>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="productId">Product</Label>
+              <div className="grid gap-1 sm:gap-2">
+                <Label htmlFor="productId" className="text-xs sm:text-sm">Product</Label>
                 <Select
                   value={simulatedScenario.productId}
                   onValueChange={(value) => handleSelectChange("productId", value)}
                   disabled={isLoadingOptions}
                 >
-                  <SelectTrigger id="productId">
+                  <SelectTrigger id="productId" className="text-xs sm:text-sm h-8 sm:h-10">
                     <SelectValue placeholder="Select a product" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[40vh]">
                     {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
+                      <SelectItem key={product.id} value={product.id} className="text-xs sm:text-sm">
                         {product.name}
                       </SelectItem>
                     ))}
@@ -443,8 +443,8 @@ export default function ScenarioPlannerPage() {
                 </Select>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="unitPrice">Unit Price ($)</Label>
+              <div className="grid gap-1 sm:gap-2">
+                <Label htmlFor="unitPrice" className="text-xs sm:text-sm">Unit Price ($)</Label>
                 <Input
                   id="unitPrice"
                   name="unitPrice"
@@ -453,14 +453,15 @@ export default function ScenarioPlannerPage() {
                   min="0"
                   value={simulatedScenario.unitPrice}
                   onChange={handleInputChange}
+                  className="text-xs sm:text-sm h-8 sm:h-10"
                 />
-                <div className="text-xs text-muted-foreground">
+                <div className="text-[10px] sm:text-xs text-muted-foreground">
                   Average price for this product: ${averageStats.price.toFixed(2)}
                 </div>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="unitCost">Unit Cost ($)</Label>
+              <div className="grid gap-1 sm:gap-2">
+                <Label htmlFor="unitCost" className="text-xs sm:text-sm">Unit Cost ($)</Label>
                 <Input
                   id="unitCost"
                   name="unitCost"
@@ -469,25 +470,26 @@ export default function ScenarioPlannerPage() {
                   min="0"
                   value={simulatedScenario.unitCost}
                   onChange={handleInputChange}
+                  className="text-xs sm:text-sm h-8 sm:h-10"
                 />
-                <div className="text-xs text-muted-foreground">
+                <div className="text-[10px] sm:text-xs text-muted-foreground">
                   Average cost for this product: ${averageStats.cost.toFixed(2)}
                 </div>
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" size="sm" onClick={resetScenario} disabled={isLoading}>
-              <RotateCcw className="mr-2 h-4 w-4" />
+          <CardFooter className="flex justify-between p-4 sm:p-6 pt-2 sm:pt-2">
+            <Button variant="outline" size="sm" onClick={resetScenario} disabled={isLoading} className="text-xs sm:text-sm h-8 sm:h-10">
+              <RotateCcw className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />
               Reset
             </Button>
-            <Button onClick={simulateRevenue} disabled={isLoading}>
+            <Button onClick={simulateRevenue} disabled={isLoading} className="text-xs sm:text-sm h-8 sm:h-10">
               {isLoading ? (
                 "Processing..."
               ) : (
                 <>
                   Simulate Revenue
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  <ArrowRight className="ml-1 sm:ml-2 h-3 sm:h-4 w-3 sm:w-4" />
                 </>
               )}
             </Button>
@@ -495,46 +497,63 @@ export default function ScenarioPlannerPage() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Prediction Results</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">Prediction Results</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Comparison between different pricing scenarios and their impact on quantity,
               revenue, and profit.
             </CardDescription>
           </CardHeader>
-          <CardContent className="h-80">
+          <CardContent className="h-60 sm:h-72 md:h-80">
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={{ theme: { grid: { stroke: "#ddd" } } }}>
-                <BarChart data={getChartData()} className="mt-6">
+                <BarChart 
+                  data={getChartData()} 
+                  className="mt-2 sm:mt-4 md:mt-6"
+                  margin={{
+                    top: 5,
+                    right: 10,
+                    left: 0,
+                    bottom: 5,
+                  }}
+                >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{fontSize: '0.7rem'}}
+                    height={40}
+                  />
+                  <YAxis 
+                    tick={{fontSize: '0.7rem'}}
+                    width={40}
+                    tickFormatter={(value) => `$${value > 999 ? `${(value/1000).toFixed(1)}k` : value}`}
+                  />
                   <ChartTooltip
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         return (
                           <ChartTooltipContent
                             content={
-                              <div className="grid gap-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="bg-blue-500 rounded-full w-3 h-3" />
-                                  <div className="grid gap-1">
-                                    <div className="text-xs">Revenue</div>
-                                    <div>${payload[0].value?.toFixed(2)}</div>
+                              <div className="grid gap-1 sm:gap-2">
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                  <div className="bg-blue-500 rounded-full w-2 sm:w-3 h-2 sm:h-3" />
+                                  <div className="grid gap-0 sm:gap-1">
+                                    <div className="text-[10px] sm:text-xs">Revenue</div>
+                                    <div className="text-xs sm:text-sm">${payload[0].value?.toFixed(2)}</div>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="bg-green-500 rounded-full w-3 h-3" />
-                                  <div className="grid gap-1">
-                                    <div className="text-xs">Profit</div>
-                                    <div>${payload[1].value?.toFixed(2)}</div>
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                  <div className="bg-green-500 rounded-full w-2 sm:w-3 h-2 sm:h-3" />
+                                  <div className="grid gap-0 sm:gap-1">
+                                    <div className="text-[10px] sm:text-xs">Profit</div>
+                                    <div className="text-xs sm:text-sm">${payload[1].value?.toFixed(2)}</div>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="bg-amber-500 rounded-full w-3 h-3" />
-                                  <div className="grid gap-1">
-                                    <div className="text-xs">Quantity</div>
-                                    <div>{payload[2].value}</div>
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                  <div className="bg-amber-500 rounded-full w-2 sm:w-3 h-2 sm:h-3" />
+                                  <div className="grid gap-0 sm:gap-1">
+                                    <div className="text-[10px] sm:text-xs">Quantity</div>
+                                    <div className="text-xs sm:text-sm">{payload[2].value}</div>
                                   </div>
                                 </div>
                               </div>
@@ -545,7 +564,11 @@ export default function ScenarioPlannerPage() {
                       return null
                     }}
                   />
-                  <Legend />
+                  <Legend 
+                    wrapperStyle={{fontSize: '0.7rem'}}
+                    iconSize={8}
+                    iconType="circle"
+                  />
                   <Bar dataKey="revenue" fill="#3b82f6" name="Revenue" />
                   <Bar dataKey="profit" fill="#22c55e" name="Profit" />
                   <Bar dataKey="quantity" fill="#eab308" name="Quantity" />
@@ -554,9 +577,9 @@ export default function ScenarioPlannerPage() {
             </ResponsiveContainer>
           </CardContent>
           {isSimulated && (
-            <CardFooter className="flex justify-end">
-              <Button size="sm" onClick={applyScenario}>
-                <Check className="mr-2 h-4 w-4" />
+            <CardFooter className="flex justify-end p-4 sm:p-6 pt-2 sm:pt-2">
+              <Button size="sm" onClick={applyScenario} className="text-xs sm:text-sm h-8 sm:h-10">
+                <Check className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />
                 Apply This Scenario
               </Button>
             </CardFooter>

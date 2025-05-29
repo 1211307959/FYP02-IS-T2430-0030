@@ -251,6 +251,35 @@
 #    - Ensured proper nesting of components within the conditional rendering
 #    - Improved code readability and maintainability
 #    - Fixed compilation error that prevented the dashboard from loading
+#
+# 30. Responsive UI Implementation (Latest)
+#    - Implemented responsive design across all main pages: dashboard, scenario planner, insights, and data input
+#    - Used Tailwind CSS breakpoints (sm, md, lg) for consistent responsive behavior
+#    - Added mobile-first approach with progressive enhancement for larger screens
+#    - Improved container padding and margins for different screen sizes
+#    - Implemented responsive grid layouts that adapt from 1 column on mobile to 2-3 columns on larger screens
+#    - Made text sizes and spacing responsive (smaller on mobile, larger on desktop)
+#    - Updated charts with responsive heights and improved font scaling
+#    - Improved filter layout to stack vertically on mobile and horizontally on desktop
+#    - Enhanced tables with horizontal scrolling for mobile devices
+#    - Made form inputs more mobile-friendly with appropriate sizing
+#    - Optimized buttons and interactive elements for touch interfaces
+#    - Added responsive tab navigation with flex-wrap for small screens
+#    - Ensured proper spacing and alignment of UI elements across all breakpoints
+#
+# 31. Business Insights System Improvements (Latest)
+#    - Fixed category consistency issues between insight generation and UI filters
+#    - Made insights truly dynamic with data-driven thresholds and conditions
+#    - Fixed logic to always feature the most critical/high priority insight
+#    - Implemented dynamic priority determination based on actual data metrics
+#    - Added pricing insights derived from revenue pattern analysis
+#    - Enhanced insight severity calculation to better reflect business impact
+#    - Made insight appearance/count fully dependent on actual data patterns
+#    - Created comprehensive documentation with detailed explanation of all insight types
+#    - Added data-driven thresholds for classifying severity (critical/high/medium/low)
+#    - Added complete details of insight triggers, metrics, and implementation plans
+#    - Ensured insights work correctly across all filter categories
+#    - Fixed TypeScript type errors in the insights component
 
 # Files created in this project (current):
 # - train_model_50_50_split.py: Script to train model with 50/50 split
@@ -268,6 +297,7 @@
 # - ethical_revenue_model.py: Script to train the ethical model with no target leakage
 # - test_ethical_model.py: Testing script specifically for the ethical model
 # - MODEL_DOCUMENTATION.md: Comprehensive model documentation with accuracy metrics
+# - MODEL_DOCUMENTATION_INSIGHTS.md: Documentation for the business insights system
 # - app/api/locations/route.ts: Next.js API route for location data
 # - app/api/products/route.ts: Next.js API route for product data (updated for dynamic loading)
 # - app/api/product-data/route.ts: Next.js API route for detailed product price/cost data from CSV
@@ -303,10 +333,15 @@
 # - Automated testing of data integrity between frontend and backend
 # - Robust API error handling and cache control for fresh data
 # - Improved dashboard UI with better visualization and toggles between profit rankings
+# - Business insights system with data-driven recommendations and implementation plans
+# - Responsive design for mobile, tablet, and desktop devices
 
 # Dependencies:
 # - Python: pandas, numpy, scikit-learn, lightgbm, joblib, matplotlib, flask, flask-cors
 # - JavaScript: React, Next.js, recharts, csv-parse
+# - Tailwind CSS for responsive utilities
+# - Recharts for responsive data visualization
+# - Shadcn UI components with responsive modifications
 
 # Dataset: trainingdataset.csv
 # Target variable: Total Revenue (log-transformed)
@@ -322,12 +357,15 @@
 # - Price_Popularity (6.31%)
 
 # Latest Updates:
-# - Fixed graph appearance issues by adjusting bar sizes from 15px to 30px for better visibility
-# - Added toggling between highest and lowest profit products to replace the separate profit improvement section
-# - Implemented a button to switch between viewing top profitable products and lowest profit products
-# - Used different color coding for highest profit (green) and lowest profit (orange) products
-# - Added proper TypeScript interfaces for product data to ensure type safety
-# - Enhanced dynamic rendering based on the selected view (top vs lowest profit)
-# - Fixed overlap issues between product rankings by ensuring proper filtering
-# - Made charts more consistent with responsive sizing and color schemes
-# - Improved general UI appearance with better spacing and layout
+# - Fixed category consistency issues between insight generation and UI filters
+# - Made insights truly dynamic with data-driven thresholds and conditions
+# - Fixed logic to always feature the most critical/high priority insight
+# - Implemented dynamic priority determination based on actual data metrics
+# - Added pricing insights derived from revenue pattern analysis
+# - Enhanced insight severity calculation to better reflect business impact
+# - Made insight appearance/count fully dependent on actual data patterns
+# - Created comprehensive documentation with detailed explanation of all insight types
+# - Added data-driven thresholds for classifying severity (critical/high/medium/low)
+# - Added complete details of insight triggers, metrics, and implementation plans
+# - Ensured insights work correctly across all filter categories
+# - Fixed TypeScript type errors in the insights component
