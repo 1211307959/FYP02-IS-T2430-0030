@@ -1,95 +1,120 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
+import { promises as fs } from 'fs';
 import path from 'path';
-import { promisify } from 'util';
 import { parse } from 'csv-parse/sync';
-
-const readFile = promisify(fs.readFile);
 
 export async function GET() {
   try {
-    // Get the data directory path
+    // Path to the data directory
     const dataDir = path.join(process.cwd(), 'public', 'data');
     
-    // Check if directory exists
-    if (!fs.existsSync(dataDir)) {
-      return NextResponse.json(
-        { error: 'Data directory not found' },
-        { status: 404 }
-      );
+    // Find CSV files in the directory
+    let files;
+    try {
+      files = (await fs.readdir(dataDir)).filter(file => file.toLowerCase().endsWith('.csv'));
+    } catch (err) {
+      console.error('Error reading data directory:', err);
+      throw new Error('Failed to read data directory');
     }
     
-    // Find CSV files in the directory
-    const files = fs.readdirSync(dataDir).filter(file => file.toLowerCase().endsWith('.csv'));
-    
     if (files.length === 0) {
-      return NextResponse.json(
-        { error: 'No CSV files found in data directory' },
-        { status: 404 }
-      );
+      throw new Error('No CSV files found in data directory');
     }
     
     // Use the first CSV file found
-    const dataFilePath = path.join(dataDir, files[0]);
-    console.log(`Using data file: ${dataFilePath}`);
+    const filePath = path.join(dataDir, files[0]);
+    console.log(`Using data file for product data: ${filePath}`);
     
-    // Read the file content
-    const fileContent = await readFile(dataFilePath, 'utf8');
+    // Read the CSV file
+    const fileContent = await fs.readFile(filePath, 'utf8');
     
-    // Parse CSV content
+    // Parse CSV
     const records = parse(fileContent, {
       columns: true,
       skip_empty_lines: true
     });
     
-    // Create a map to store product data
+    // If no records found
+    if (!records || records.length === 0) {
+      throw new Error('No data records found in CSV file');
+    }
+    
+    // Get product ID column name
+    const header = Object.keys(records[0]);
+    const productIdColumn = header.find(h => 
+      ['_ProductID', 'ProductID', 'Product_ID', 'product_id'].includes(h)
+    );
+    
+    if (!productIdColumn) {
+      throw new Error('Product ID column not found in CSV');
+    }
+    
+    // Get price and cost column names
+    const priceColumn = header.find(h => 
+      ['Unit Price', 'UnitPrice', 'Price', 'unit_price'].includes(h)
+    );
+    const costColumn = header.find(h => 
+      ['Unit Cost', 'UnitCost', 'Cost', 'unit_cost'].includes(h)
+    );
+    
+    if (!priceColumn) {
+      throw new Error('Price column not found in CSV');
+    }
+    if (!costColumn) {
+      throw new Error('Cost column not found in CSV');
+    }
+    
+    // Calculate average price and cost for each product
     const productMap = new Map();
     
-    // Process records to extract product data
-    records.forEach(record => {
-      // Try to get ProductID from different possible column names
-      const productId = parseInt(record['_ProductID'] || record['ProductID'] || record['Product_ID'] || record['product_id'] || '0');
-      const unitPrice = parseFloat(record['Unit Price'] || record['UnitPrice'] || record['Price'] || record['unit_price'] || '0');
-      const unitCost = parseFloat(record['Unit Cost'] || record['UnitCost'] || record['Cost'] || record['unit_cost'] || '0');
+    for (const record of records) {
+      const productId = Number(record[productIdColumn]);
+      const price = Number(record[priceColumn]);
+      const cost = Number(record[costColumn]);
       
-      if (!isNaN(productId) && !isNaN(unitPrice) && !isNaN(unitCost)) {
-        // Store data by product ID (not in PROD format)
-        if (!productMap.has(productId)) {
-          productMap.set(productId, {
-            count: 1,
-            totalPrice: unitPrice,
-            totalCost: unitCost
-          });
-        } else {
-          const current = productMap.get(productId);
-          productMap.set(productId, {
-            count: current.count + 1,
-            totalPrice: current.totalPrice + unitPrice,
-            totalCost: current.totalCost + unitCost
-          });
-        }
+      if (isNaN(productId) || isNaN(price) || isNaN(cost)) {
+        continue; // Skip invalid records
       }
-    });
+      
+      if (!productMap.has(productId)) {
+        productMap.set(productId, { 
+          count: 0, 
+          totalPrice: 0, 
+          totalCost: 0 
+        });
+      }
+      
+      const data = productMap.get(productId);
+      data.count++;
+      data.totalPrice += price;
+      data.totalCost += cost;
+    }
     
-    // Calculate averages and format the response
-    const productData = Array.from(productMap.entries()).map(([id, data]) => ({
-      productId: id, // Keep as number
+    // Calculate averages and format results
+    const products = Array.from(productMap.entries()).map(([productId, data]) => ({
+      productId,
       price: data.totalPrice / data.count,
       cost: data.totalCost / data.count
     }));
     
-    // Return product data as JSON
+    // Sort by product ID
+    products.sort((a, b) => a.productId - b.productId);
+    
+    // Return product data
     return NextResponse.json({
-      message: 'Product data loaded from file',
+      status: 'success',
       source: files[0],
-      lastUpdated: new Date().toISOString(),
-      products: productData
+      products
     });
     
-  } catch (error) {
-    console.error('Error fetching product data:', error);
+  } catch (error: any) {
+    console.error('Error in product-data API route:', error);
+    
     return NextResponse.json(
-      { error: 'Failed to fetch product data' },
+      { 
+        status: 'error',
+        error: error.message || 'Failed to get product data' 
+      },
       { status: 500 }
     );
   }

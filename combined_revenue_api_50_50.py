@@ -26,6 +26,37 @@ ENCODERS_PATH = os.path.join(BASE_DIR, 'revenue_encoders_50_50_split.pkl')
 # Instead of tracking a single current data file, we'll track all files
 ALL_DATA_FILES = []
 COMBINED_DATA = None
+DEFAULT_LOCATION = "North"  # This will be updated when data is loaded
+DEFAULT_PRODUCT_ID = 12     # This will be updated when data is loaded
+
+def update_defaults_from_data():
+    """Update default values from the data"""
+    global DEFAULT_LOCATION, DEFAULT_PRODUCT_ID, COMBINED_DATA
+    
+    if COMBINED_DATA is None or COMBINED_DATA.empty:
+        return
+    
+    # Get first location
+    if 'Location' in COMBINED_DATA.columns:
+        locations = COMBINED_DATA['Location'].unique()
+        if len(locations) > 0:
+            DEFAULT_LOCATION = locations[0]
+    
+    # Get first product ID
+    product_column = None
+    for col in ['_ProductID', 'ProductID', 'Product_ID', 'product_id']:
+        if col in COMBINED_DATA.columns:
+            product_column = col
+            break
+    
+    if product_column:
+        product_ids = COMBINED_DATA[product_column].unique()
+        if len(product_ids) > 0:
+            try:
+                DEFAULT_PRODUCT_ID = int(product_ids[0])
+            except (ValueError, TypeError):
+                # Keep the default if we can't convert to int
+                pass
 
 def validate_api_input(data):
     """Validate API input data"""
@@ -37,7 +68,36 @@ def validate_api_input(data):
         'Weekday', 'Location', '_ProductID', 'Year'
     ]
     
-    missing_fields = [field for field in required_fields if field not in data]
+    # Check for missing fields and apply defaults where possible
+    missing_fields = []
+    for field in required_fields:
+        if field not in data:
+            if field == 'Location':
+                data[field] = DEFAULT_LOCATION
+            elif field == '_ProductID':
+                data[field] = DEFAULT_PRODUCT_ID
+            elif field in ['Month', 'Day', 'Year']:
+                # Use current date for missing date fields
+                current_date = datetime.now()
+                if field == 'Month':
+                    data[field] = current_date.month
+                elif field == 'Day':
+                    data[field] = current_date.day
+                elif field == 'Year':
+                    data[field] = current_date.year
+            elif field == 'Weekday':
+                # Use current weekday
+                data[field] = datetime.now().strftime('%A')
+            else:
+                missing_fields.append(field)
+    
+    # Handle special "All" location value - convert to first available location for model prediction
+    # The model doesn't understand "All" as a location, so we use a real location
+    if 'Location' in data and data['Location'] == 'All':
+        # For an individual prediction, we'll use the default location
+        data['Location'] = DEFAULT_LOCATION
+        # (The actual handling of "All" locations for aggregation happens in the endpoints)
+    
     if missing_fields:
         return False, f"Missing required fields: {', '.join(missing_fields)}"
         
@@ -127,6 +187,10 @@ def load_combined_data():
         # Combine all dataframes
         COMBINED_DATA = pd.concat(dataframes, ignore_index=True)
         print(f"Combined data has {len(COMBINED_DATA)} rows and {len(COMBINED_DATA.columns)} columns")
+        
+        # Update default values from the loaded data
+        update_defaults_from_data()
+        
         return True
     except Exception as e:
         print(f"Error loading combined data: {str(e)}")
@@ -478,7 +542,23 @@ def health_check():
 def get_locations():
     """Return all unique locations from the training data."""
     try:
-        # Load encoders
+        # First try to get locations from the actual data files
+        global COMBINED_DATA
+        
+        if COMBINED_DATA is None or COMBINED_DATA.empty:
+            success = load_combined_data()
+            if not success:
+                # Fall back to encoders if data loading fails
+                pass
+            else:
+                # Get unique locations from the loaded data
+                if 'Location' in COMBINED_DATA.columns:
+                    locations = COMBINED_DATA['Location'].unique().tolist()
+                    # Return non-empty locations
+                    locations = [loc for loc in locations if loc and not pd.isna(loc)]
+                    return jsonify({'locations': locations})
+        
+        # Fallback to encoders if we can't get from data or there's no Location column
         encoders = joblib.load(ENCODERS_PATH)
         
         # Get location encoder
@@ -496,7 +576,32 @@ def get_locations():
 def get_products():
     """Return all unique products from the training data."""
     try:
-        # Load encoders
+        # First try to get products from the actual data files
+        global COMBINED_DATA
+        
+        if COMBINED_DATA is None or COMBINED_DATA.empty:
+            success = load_combined_data()
+            if not success:
+                # Fall back to encoders if data loading fails
+                pass
+            else:
+                # Get unique products from the loaded data
+                product_column = None
+                for col in ['_ProductID', 'ProductID', 'Product_ID', 'product_id']:
+                    if col in COMBINED_DATA.columns:
+                        product_column = col
+                        break
+                
+                if product_column:
+                    products = COMBINED_DATA[product_column].unique().tolist()
+                    # Return non-empty products, and convert to integers if possible
+                    products = [int(prod) if not pd.isna(prod) and str(prod).isdigit() else prod 
+                               for prod in products if prod and not pd.isna(prod)]
+                    # Sort products
+                    products.sort()
+                    return jsonify({'products': products})
+        
+        # Fallback to encoders if we can't get from data
         encoders = joblib.load(ENCODERS_PATH)
         
         # Get product encoder
@@ -529,6 +634,12 @@ def api_predict_revenue():
                 'error': error_message
             }), 400
         
+        # Check for "All" location - special case
+        is_all_locations = False
+        if data.get('Location') == 'All':
+            is_all_locations = True
+            # The validate_api_input function already set a default location
+        
         # Make prediction
         result = predict_revenue(data)
         
@@ -537,6 +648,10 @@ def api_predict_revenue():
             return jsonify({
                 'error': result['error']
             }), 400
+        
+        # If "All" locations was selected, add a note in the response
+        if is_all_locations:
+            result['note'] = "Used default location for prediction. For location-specific predictions, select a specific location."
             
         # Return prediction
         return jsonify({
@@ -556,25 +671,46 @@ def api_predict_revenue():
 # Simulate revenue at different price points
 @app.route('/simulate-revenue', methods=['POST'])
 def api_simulate_revenue():
-    """Simulate revenue at different price points."""
+    """Simulate revenue at different price points"""
     try:
-        # Parse JSON input
-        if not request.is_json:
-            return jsonify({
-                'error': 'Request must be JSON'
-            }), 400
-            
+        # Get JSON data from request
         data = request.get_json()
         
-        # Log the incoming request for debugging
-        print(f"Received simulate-revenue request: {json.dumps(data, indent=2)}")
+        # Generate a unique request ID for tracking
+        request_id = datetime.now().strftime("%Y%m%d%H%M%S") + str(random.randint(1000, 9999))
         
-        # Validate input
-        is_valid, error_message = validate_api_input(data)
-        if not is_valid:
-            return jsonify({
-                'error': error_message
-            }), 400
+        # Print the incoming request for debugging
+        print(f"Received simulate-revenue request ({request_id}): {json.dumps(data, indent=2)}")
+        
+        # Remove any timestamp or cache-busting fields
+        for field in list(data.keys()):
+            if field.startswith('_') and field not in ['_ProductID']:
+                data.pop(field)
+        
+        # Handle null values in required fields
+        if data.get('_ProductID') is None:
+            data['_ProductID'] = DEFAULT_PRODUCT_ID
+            
+        if data.get('Unit Price') is None:
+            data['Unit Price'] = 100.0  # Default price if none provided
+            
+        if data.get('Unit Cost') is None:
+            data['Unit Cost'] = 50.0  # Default cost if none provided
+        
+        # Check for "All" location - special case
+        is_all_locations = False
+        original_location = data.get('Location')
+        if original_location == 'All':
+            is_all_locations = True
+            # We'll handle this specially below
+        
+        # Validate input (except for All locations case which we'll handle separately)
+        if not is_all_locations:
+            is_valid, error_message = validate_api_input(data)
+            if not is_valid:
+                return jsonify({
+                    'error': error_message
+                }), 400
             
         # Check for extreme values
         unit_price = float(data.get('Unit Price', 0))
@@ -604,7 +740,175 @@ def api_simulate_revenue():
                 'error': 'Steps must be between 2 and 50'
             }), 400
         
-        # Simulate prices
+        # Log parameters being used for simulation
+        print(f"Simulation parameters ({request_id}): Price=${unit_price}, " + 
+              f"Product={data.get('_ProductID')}, Location={original_location}, " +
+              f"Factors: {min_price_factor}-{max_price_factor}, Steps: {steps}")
+        
+        # Special handling for "All Locations"
+        if is_all_locations:
+            # Get all available locations
+            try:
+                encoders = joblib.load(ENCODERS_PATH)
+                if 'Location' in encoders:
+                    if isinstance(encoders['Location'], list):
+                        available_locations = encoders['Location']
+                    else:
+                        available_locations = encoders['Location'].classes_.tolist()
+                else:
+                    # Fallback to just using the default location
+                    available_locations = [DEFAULT_LOCATION]
+            except Exception as e:
+                print(f"Error loading location encoders: {str(e)}")
+                available_locations = [DEFAULT_LOCATION]
+            
+            # Maximum number of locations to process to avoid overload
+            max_locations = min(5, len(available_locations))
+            selected_locations = available_locations[:max_locations]
+            
+            print(f"Processing {len(selected_locations)} locations for 'All Locations' request: {selected_locations}")
+            
+            # Initialize combined results
+            all_variations_by_factor = {}
+            default_note = f"Using combined data from {len(selected_locations)} locations: {', '.join(selected_locations[:3])}"
+            if len(selected_locations) > 3:
+                default_note += f" and {len(selected_locations) - 3} more"
+            default_note += ". Values represent the SUM across all regions."
+            
+            # Process each location
+            location_predictions = {}  # Store predictions by location for debugging
+            
+            for location in selected_locations:
+                # Create a copy of the data for this location
+                location_data = data.copy()
+                location_data['Location'] = location
+                
+                # Validate the location-specific data
+                is_valid, error_message = validate_api_input(location_data)
+                if not is_valid:
+                    print(f"Skipping invalid location data for {location}: {error_message}")
+                    continue
+                
+                # Simulate for this location
+                try:
+                    variations = simulate_price_variations(
+                        location_data,
+                        min_price_factor=min_price_factor,
+                        max_price_factor=max_price_factor,
+                        steps=steps
+                    )
+                    
+                    # Store location predictions for debugging
+                    location_predictions[location] = {}
+                    for var in variations:
+                        factor = var.get('price_factor', 0)
+                        if factor not in location_predictions[location]:
+                            location_predictions[location][factor] = {
+                                'quantity': var.get('quantity', 0),
+                                'revenue': var.get('revenue', 0),
+                                'profit': var.get('profit', 0)
+                            }
+                    
+                    # Group by price factor
+                    for var in variations:
+                        factor = var.get('price_factor')
+                        if factor not in all_variations_by_factor:
+                            all_variations_by_factor[factor] = []
+                        
+                        # Make sure to store the raw quantities from the prediction
+                        if 'raw_quantity' not in var and 'quantity' in var:
+                            var['raw_quantity'] = var['quantity']
+                        
+                        all_variations_by_factor[factor].append(var)
+                except Exception as e:
+                    print(f"Error simulating for location {location}: {str(e)}")
+                    # Continue with other locations
+            
+            # Debug: Print quantities by location to diagnose the issue
+            print("\n=== QUANTITY DEBUGGING FOR ALL LOCATIONS ===")
+            if location_predictions:
+                factors = sorted(list(next(iter(location_predictions.values())).keys()))
+                for factor in factors:
+                    print(f"\nPrice factor: {factor}")
+                    total_qty = 0
+                    for location, predictions in location_predictions.items():
+                        if factor in predictions:
+                            qty = predictions[factor]['quantity']
+                            print(f"  {location}: quantity={qty}")
+                            total_qty += qty
+                    print(f"  TOTAL: {total_qty}")
+            print("============================================\n")
+            
+            # Combine results by SUMMING each metric for each price point
+            combined_variations = []
+            
+            for factor, variations in sorted(all_variations_by_factor.items()):
+                if not variations:
+                    continue
+                    
+                # Calculate total values for each metric
+                scenario_name = variations[0].get('Scenario', f"{int(factor * 100)}% of Price")
+                unit_price = variations[0].get('Unit Price', 0)
+                
+                # Sum raw quantities (not scaled quantities) across locations
+                # First check if raw_quantity exists, otherwise use quantity
+                total_raw_quantity = sum(var.get('raw_quantity', var.get('quantity', 0)) for var in variations)
+                total_revenue = sum(var.get('revenue', 0) for var in variations)
+                total_profit = sum(var.get('profit', 0) for var in variations)
+                
+                # Log for debugging
+                print(f"Factor {factor}: Using raw quantities - Total: {total_raw_quantity}")
+                
+                # Create the combined variation - use SUMS rather than averages
+                combined_var = {
+                    'Scenario': scenario_name,
+                    'scenario': scenario_name,
+                    'Unit Price': unit_price,
+                    'unit_price': unit_price,
+                    'unitPrice': unit_price,
+                    'Predicted Revenue': total_revenue,
+                    'predicted_revenue': total_revenue,
+                    'revenue': total_revenue,
+                    'Predicted Quantity': total_raw_quantity,
+                    'predicted_quantity': total_raw_quantity,
+                    'raw_quantity': total_raw_quantity,  # Store raw quantity for frontend
+                    'quantity': total_raw_quantity,      # Set display quantity to raw quantity
+                    'Profit': total_profit,
+                    'profit': total_profit,
+                    'price_factor': factor,
+                    'locations_aggregated': len(variations)
+                }
+                
+                combined_variations.append(combined_var)
+            
+            # Sort the combined variations by price factor
+            combined_variations.sort(key=lambda x: x.get('price_factor', 0))
+            
+            # Check if we have any results
+            if not combined_variations:
+                # Return fallback data
+                print(f"No valid variations for any location in 'All Locations' request")
+                # Generate fallback data (similar to the existing fallback code)
+                fallback_variations = generate_fallback_variations(unit_price, data.get('Unit Cost', 50.0))
+                
+                return jsonify({
+                    'status': 'success',
+                    'results': fallback_variations,
+                    'simulations': fallback_variations,
+                    'note': 'Fallback data generated for All Locations. No valid data from any location.',
+                    'request_id': request_id
+                })
+            
+            # Return the combined results
+            return jsonify({
+                'status': 'success',
+                'results': combined_variations,
+                'simulations': combined_variations,
+                'note': default_note,
+                'request_id': request_id
+            })
+        
+        # Normal case - single location
         variations = simulate_price_variations(
             data,
             min_price_factor=min_price_factor,
@@ -612,153 +916,30 @@ def api_simulate_revenue():
             steps=steps
         )
         
+        # Log the simulation results
+        print(f"Simulation results ({request_id}): Generated {len(variations)} variations")
+        
         if not variations:
-            print(f"Warning: No variations generated for input: {json.dumps(data, indent=2)}")
+            print(f"Warning: No variations generated for input ({request_id}): {json.dumps(data, indent=2)}")
             # Return fallback data instead of error
-            base_price = unit_price
-            base_cost = float(data.get('Unit Cost', 0))
-            
-            # Create more realistic fallback data
-            # High price = low quantity, low price = high quantity
-            fallback_variations = []
-            
-            # Calculate reasonable quantities based on price
-            if base_price > 10000:  # Very high price
-                # Almost no sales at very high prices
-                fallback_variations = [
-                    {
-                        'Scenario': '50% of Price',
-                        'Unit Price': base_price * 0.5,
-                        'Predicted Revenue': base_price * 0.5 * 2,
-                        'Predicted Quantity': 2,
-                        'Profit': (base_price * 0.5 * 2) - (base_cost * 2),
-                        'revenue': base_price * 0.5 * 2,
-                        'quantity': 2,
-                        'profit': (base_price * 0.5 * 2) - (base_cost * 2)
-                    },
-                    {
-                        'Scenario': '75% of Price',
-                        'Unit Price': base_price * 0.75,
-                        'Predicted Revenue': base_price * 0.75 * 1,
-                        'Predicted Quantity': 1,
-                        'Profit': (base_price * 0.75) - base_cost,
-                        'revenue': base_price * 0.75,
-                        'quantity': 1,
-                        'profit': (base_price * 0.75) - base_cost
-                    },
-                    {
-                        'Scenario': '100% of Price',
-                        'Unit Price': base_price,
-                        'Predicted Revenue': 0,
-                        'Predicted Quantity': 0,
-                        'Profit': 0,
-                        'revenue': 0,
-                        'quantity': 0,
-                        'profit': 0
-                    },
-                    {
-                        'Scenario': '125% of Price',
-                        'Unit Price': base_price * 1.25,
-                        'Predicted Revenue': 0,
-                        'Predicted Quantity': 0,
-                        'Profit': 0,
-                        'revenue': 0,
-                        'quantity': 0,
-                        'profit': 0
-                    },
-                    {
-                        'Scenario': '150% of Price',
-                        'Unit Price': base_price * 1.5,
-                        'Predicted Revenue': 0,
-                        'Predicted Quantity': 0,
-                        'Profit': 0,
-                        'revenue': 0,
-                        'quantity': 0,
-                        'profit': 0
-                    },
-                    {
-                        'Scenario': '175% of Price',
-                        'Unit Price': base_price * 1.75,
-                        'Predicted Revenue': 0,
-                        'Predicted Quantity': 0,
-                        'Profit': 0,
-                        'revenue': 0,
-                        'quantity': 0,
-                        'profit': 0
-                    },
-                    {
-                        'Scenario': '200% of Price',
-                        'Unit Price': base_price * 2.0,
-                        'Predicted Revenue': 0,
-                        'Predicted Quantity': 0,
-                        'Profit': 0,
-                        'revenue': 0,
-                        'quantity': 0,
-                        'profit': 0
-                    }
-                ]
-            else:
-                # More normal price range - create a proper price elasticity curve
-                for i, factor in enumerate([0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]):
-                    # Price elasticity curve: quantity decreases as price increases
-                    # Formula: quantity = base_quantity * (price_factor^elasticity)
-                    # Where elasticity is negative (typically -1 to -3 for most products)
-                    price = base_price * factor
-                    
-                    # Vary elasticity based on price range for more realistic behavior
-                    if base_price < 2000:
-                        # Low-priced products usually have higher elasticity
-                        elasticity = -1.8
-                        base_quantity = 15
-                    elif base_price < 5000:
-                        # Mid-priced products have moderate elasticity
-                        elasticity = -1.5
-                        base_quantity = 10
-                    else:
-                        # High-priced products have lower elasticity
-                        elasticity = -1.2
-                        base_quantity = 5
-                    
-                    # Calculate quantity based on elasticity formula
-                    quantity = max(0, round(base_quantity * (factor ** elasticity)))
-                    
-                    # Calculate revenue and profit
-                    revenue = price * quantity
-                    profit = revenue - (base_cost * quantity)
-                    
-                    # Calculate scaled quantity for chart display
-                    max_revenue = base_price * base_quantity * 0.5  # Rough estimate of max possible revenue
-                    target_quantity = max_revenue / 3  # Target quantity for visualization
-                    scale_factor = target_quantity / base_quantity if base_quantity > 0 else 1
-                    quantity_for_chart = quantity * scale_factor if quantity > 0 else 0
-                    
-                    scenario_name = "Current Price" if factor == 1.0 else f"{int(factor * 100)}% of Price"
-                    
-                    fallback_variations.append({
-                        'Scenario': scenario_name,
-                        'Unit Price': price,
-                        'Predicted Revenue': revenue,
-                        'Predicted Quantity': quantity,
-                        'Profit': profit,
-                        'revenue': revenue,
-                        'quantity': quantity_for_chart,  # Use scaled quantity for chart
-                        'profit': profit,
-                        'raw_quantity': quantity  # Store original quantity
-                    })
+            fallback_variations = generate_fallback_variations(unit_price, data.get('Unit Cost', 50.0))
             
             # Return fallback simulations
+            print(f"Returning fallback data ({request_id}) with {len(fallback_variations)} variations")
             return jsonify({
                 'status': 'success',
                 'results': fallback_variations,
                 'simulations': fallback_variations,
-                'note': 'Fallback data generated due to simulation failure'
+                'note': 'Fallback data generated due to simulation failure',
+                'request_id': request_id
             })
             
         # Return results with multiple field names for compatibility
         return jsonify({
             'status': 'success',
             'results': variations,
-            'simulations': variations
+            'simulations': variations,
+            'request_id': request_id
         })
         
     except json.JSONDecodeError:
@@ -777,6 +958,137 @@ def api_simulate_revenue():
         return jsonify({
             'error': f"Unexpected error: {str(e)}"
         }), 500
+
+# Helper function to generate fallback variations for extreme price cases
+def generate_fallback_variations(base_price, base_cost):
+    """Generate fallback price variation data with realistic elasticity"""
+    fallback_variations = []
+    
+    # Check if this is a very high price
+    if base_price > 10000:  # Very high price
+        # Almost no sales at very high prices
+        fallback_variations = [
+            {
+                'Scenario': '50% of Price',
+                'Unit Price': base_price * 0.5,
+                'Predicted Revenue': base_price * 0.5 * 2,
+                'Predicted Quantity': 2,
+                'Profit': (base_price * 0.5 * 2) - (base_cost * 2),
+                'revenue': base_price * 0.5 * 2,
+                'quantity': 2,
+                'profit': (base_price * 0.5 * 2) - (base_cost * 2)
+            },
+            {
+                'Scenario': '75% of Price',
+                'Unit Price': base_price * 0.75,
+                'Predicted Revenue': base_price * 0.75 * 1,
+                'Predicted Quantity': 1,
+                'Profit': (base_price * 0.75) - base_cost,
+                'revenue': base_price * 0.75,
+                'quantity': 1,
+                'profit': (base_price * 0.75) - base_cost
+            },
+            {
+                'Scenario': '100% of Price',
+                'Unit Price': base_price,
+                'Predicted Revenue': 0,
+                'Predicted Quantity': 0,
+                'Profit': 0,
+                'revenue': 0,
+                'quantity': 0,
+                'profit': 0
+            },
+            {
+                'Scenario': '125% of Price',
+                'Unit Price': base_price * 1.25,
+                'Predicted Revenue': 0,
+                'Predicted Quantity': 0,
+                'Profit': 0,
+                'revenue': 0,
+                'quantity': 0,
+                'profit': 0
+            },
+            {
+                'Scenario': '150% of Price',
+                'Unit Price': base_price * 1.5,
+                'Predicted Revenue': 0,
+                'Predicted Quantity': 0,
+                'Profit': 0,
+                'revenue': 0,
+                'quantity': 0,
+                'profit': 0
+            },
+            {
+                'Scenario': '175% of Price',
+                'Unit Price': base_price * 1.75,
+                'Predicted Revenue': 0,
+                'Predicted Quantity': 0,
+                'Profit': 0,
+                'revenue': 0,
+                'quantity': 0,
+                'profit': 0
+            },
+            {
+                'Scenario': '200% of Price',
+                'Unit Price': base_price * 2.0,
+                'Predicted Revenue': 0,
+                'Predicted Quantity': 0,
+                'Profit': 0,
+                'revenue': 0,
+                'quantity': 0,
+                'profit': 0
+            }
+        ]
+    else:
+        # More normal price range - create a proper price elasticity curve
+        for i, factor in enumerate([0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]):
+            # Price elasticity curve: quantity decreases as price increases
+            # Formula: quantity = base_quantity * (price_factor^elasticity)
+            # Where elasticity is negative (typically -1 to -3 for most products)
+            price = base_price * factor
+            
+            # Vary elasticity based on price range for more realistic behavior
+            if base_price < 2000:
+                # Low-priced products usually have higher elasticity
+                elasticity = -1.8
+                base_quantity = 15
+            elif base_price < 5000:
+                # Mid-priced products have moderate elasticity
+                elasticity = -1.5
+                base_quantity = 10
+            else:
+                # High-priced products have lower elasticity
+                elasticity = -1.2
+                base_quantity = 5
+            
+            # Calculate quantity based on elasticity formula
+            quantity = max(0, round(base_quantity * (factor ** elasticity)))
+            
+            # Calculate revenue and profit
+            revenue = price * quantity
+            profit = revenue - (base_cost * quantity)
+            
+            # Calculate scaled quantity for chart display
+            max_revenue = base_price * base_quantity * 0.5  # Rough estimate of max possible revenue
+            target_quantity = max_revenue / 3  # Target quantity for visualization
+            scale_factor = target_quantity / base_quantity if base_quantity > 0 else 1
+            quantity_for_chart = quantity * scale_factor if quantity > 0 else 0
+            
+            scenario_name = "Current Price" if factor == 1.0 else f"{int(factor * 100)}% of Price"
+            
+            fallback_variations.append({
+                'Scenario': scenario_name,
+                'Unit Price': price,
+                'Predicted Revenue': revenue,
+                'Predicted Quantity': quantity,
+                'Profit': profit,
+                'revenue': revenue,
+                'quantity': quantity_for_chart,  # Use scaled quantity for chart
+                'profit': profit,
+                'raw_quantity': quantity  # Store original quantity
+            })
+            
+    return fallback_variations
 
 # Optimize price for revenue or profit
 @app.route('/optimize-price', methods=['POST'])

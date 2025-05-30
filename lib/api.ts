@@ -104,38 +104,34 @@ export async function loadSampleCsvData() {
 }
 
 /**
- * Get all products from the dataset
+ * Fetches locations from the API
  */
-export async function getProducts() {
+export async function getLocations() {
   try {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/products`);
-    
+    const response = await fetch('/api/locations');
     if (!response.ok) {
-      throw new Error('Failed to fetch products');
+      throw new Error(`API error: ${response.status}`);
     }
-    
     return await response.json();
   } catch (error) {
-    console.error('Error fetching products:', error);
-    throw error;
+    console.error('Failed to fetch locations:', error);
+    return [];
   }
 }
 
 /**
- * Get all locations from the dataset
+ * Fetches products from the API
  */
-export async function getLocations() {
+export async function getProducts() {
   try {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/locations`);
-    
+    const response = await fetch('/api/products');
     if (!response.ok) {
-      throw new Error('Failed to fetch locations');
+      throw new Error(`API error: ${response.status}`);
     }
-    
     return await response.json();
   } catch (error) {
-    console.error('Error fetching locations:', error);
-    throw error;
+    console.error('Failed to fetch products:', error);
+    return [];
   }
 }
 
@@ -183,125 +179,133 @@ export async function getDashboardData(cacheBustQuery?: string) {
 }
 
 /**
- * Make a revenue prediction
+ * Fetches product price and cost data from the API
  */
-export async function predictRevenue(orderData: any) {
+export async function getProductData() {
   try {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/predict`, {
+    const response = await fetch('/api/product-data');
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch product data:', error);
+    return { products: [] };
+  }
+}
+
+/**
+ * Maps the frontend order data to the format expected by the API
+ */
+export function mapToApiOrderFormat(data) {
+  // Create a new object to avoid mutating the input
+  const apiData = {};
+  
+  // Handle product ID - convert to numeric format expected by backend
+  if (data.productId) {
+    apiData._ProductID = parseInt(String(data.productId), 10);
+  }
+  
+  // Handle Location/locationId
+  if (data.locationId) {
+    apiData.Location = data.locationId;
+  }
+  
+  // Handle unit price
+  if (data.unitPrice !== undefined) {
+    apiData['Unit Price'] = parseFloat(String(data.unitPrice));
+  }
+  
+  // Handle unit cost
+  if (data.unitCost !== undefined) {
+    apiData['Unit Cost'] = parseFloat(String(data.unitCost));
+  }
+  
+  // Handle any other fields that might be present
+  if (data.Month) apiData.Month = parseInt(String(data.Month), 10);
+  if (data.Day) apiData.Day = parseInt(String(data.Day), 10);
+  if (data.Year) apiData.Year = parseInt(String(data.Year), 10);
+  if (data.Weekday) apiData.Weekday = data.Weekday;
+  
+  // Add weekday if not present
+  if (!apiData.Weekday) {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    apiData.Weekday = days[new Date().getDay()];
+  }
+  
+  // Debug log the mapping
+  console.log('Frontend data:', data);
+  console.log('Mapped to API format:', apiData);
+  
+  return apiData;
+}
+
+/**
+ * Simulates revenue scenarios with different price points
+ */
+export async function simulateScenarios(data) {
+  try {
+    // Add timestamp to prevent browser caching
+    const timestamp = new Date().getTime();
+    data._timestamp = timestamp;
+    
+    // Convert data to the format expected by the API
+    const apiData = typeof data.locationId !== 'undefined' ? mapToApiOrderFormat(data) : data;
+    
+    // Log request being sent
+    console.log('Simulating revenue with data:', apiData);
+    
+    // Make sure required fields have values (not null or undefined)
+    if (apiData._ProductID === null || apiData._ProductID === undefined) {
+      apiData._ProductID = 1; // Default product ID
+    }
+    
+    if (apiData['Unit Price'] === null || apiData['Unit Price'] === undefined || isNaN(apiData['Unit Price'])) {
+      apiData['Unit Price'] = 100.0; // Default price
+    }
+    
+    if (apiData['Unit Cost'] === null || apiData['Unit Cost'] === undefined || isNaN(apiData['Unit Cost'])) {
+      apiData['Unit Cost'] = 50.0; // Default cost
+    }
+    
+    // Ensure values are proper types
+    apiData._ProductID = parseInt(String(apiData._ProductID), 10);
+    apiData['Unit Price'] = parseFloat(String(apiData['Unit Price']));
+    apiData['Unit Cost'] = parseFloat(String(apiData['Unit Cost']));
+    
+    // Ensure Location is present
+    if (!apiData.Location) {
+      apiData.Location = 'Central'; // Default location
+    }
+    
+    const response = await fetch('/api/simulate-revenue', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
       },
-      body: JSON.stringify(orderData),
+      body: JSON.stringify(apiData),
+      cache: 'no-store'
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to predict revenue');
+      const errorData = await response.json().catch(() => null);
+      throw new Error(
+        errorData?.error || `API error: ${response.status}`
+      );
     }
     
-    return await response.json();
+    const result = await response.json();
+    
+    // Log response for debugging
+    console.log('Simulation response:', result);
+    
+    return result;
   } catch (error) {
-    console.error('Error predicting revenue:', error);
+    console.error('Failed to simulate scenarios:', error);
     throw error;
   }
-}
-
-/**
- * Simulate different scenarios
- */
-export async function simulateScenarios(baseData: any, scenarios?: any[]) {
-  try {
-    // Fix any potential format issues with the data
-    const fixedBaseData = { ...baseData };
-    
-    // Ensure ProductID is properly formatted as a number
-    if (fixedBaseData._ProductID && typeof fixedBaseData._ProductID === 'string') {
-      fixedBaseData._ProductID = parseInt(fixedBaseData._ProductID, 10);
-    }
-    
-    // Ensure required numeric fields are numbers
-    if (typeof fixedBaseData['Unit Price'] === 'string') {
-      fixedBaseData['Unit Price'] = parseFloat(fixedBaseData['Unit Price']);
-    }
-    if (typeof fixedBaseData['Unit Cost'] === 'string') {
-      fixedBaseData['Unit Cost'] = parseFloat(fixedBaseData['Unit Cost']);
-    }
-    
-    // Create the request body
-    const requestBody = fixedBaseData;
-    
-    // Add optional parameters
-    if (scenarios && scenarios.length > 0) {
-      // The API doesn't use the scenarios property directly
-      // Just add min/max price factors and steps
-      requestBody.min_price_factor = 0.5;
-      requestBody.max_price_factor = 2.0;
-      requestBody.steps = 7;
-    }
-    
-    console.log('Sending request to simulate-revenue endpoint:', JSON.stringify(requestBody, null, 2));
-    
-    // Use a longer timeout for simulation requests (15 seconds)
-    const response = await fetchWithTimeout(`${API_BASE_URL}/simulate-revenue`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    }, 15000);
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Error from simulate-revenue endpoint:', errorData);
-      throw new Error(errorData.error || 'Failed to simulate scenarios');
-    }
-    
-    // Parse response text first to check for valid JSON
-    const responseText = await response.text();
-    let responseData;
-    
-    try {
-      responseData = JSON.parse(responseText);
-    } catch (e) {
-      console.error('Invalid JSON response:', responseText);
-      throw new Error('Invalid response format from API');
-    }
-    
-    console.log('Response from simulate-revenue endpoint:', JSON.stringify(responseData, null, 2));
-    return responseData;
-  } catch (error) {
-    console.error('Error simulating scenarios:', error);
-    // Check for timeout errors
-    if (error.name === 'AbortError') {
-      throw new Error('Request timed out. The server took too long to respond.');
-    }
-    throw error;
-  }
-}
-
-/**
- * Helper function to map frontend order data to the API format
- */
-export function mapToApiOrderFormat(frontendData: any) {
-  // Get weekday as string (Sunday, Monday, etc.)
-  const weekdays = [
-    "Sunday", "Monday", "Tuesday", "Wednesday", 
-    "Thursday", "Friday", "Saturday"
-  ];
-  const weekday = weekdays[new Date().getDay()];
-  
-  // The API expects specific field names
-  return {
-    "Location": frontendData.locationId || "North", // Use the location directly from dropdown
-    "_ProductID": parseInt(frontendData.productId) || 1, // Use numeric ID value
-    "Unit Cost": parseFloat(frontendData.unitCost) || 0,
-    "Unit Price": parseFloat(frontendData.unitPrice) || 0,
-    "Month": new Date().getMonth() + 1, // Current month
-    "Day": new Date().getDate(), // Current day
-    "Weekday": weekday, // Current weekday as string
-    "Year": new Date().getFullYear() // Current year
-  };
 }
 
 /**
@@ -361,24 +365,6 @@ export async function uploadFile(file: File) {
     return await response.json();
   } catch (error) {
     console.error('Error uploading file:', error);
-    throw error;
-  }
-}
-
-/**
- * Get product price and cost data directly from the data file
- */
-export async function getProductData() {
-  try {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/product-data`);
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch product data');
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching product data:', error);
     throw error;
   }
 } 

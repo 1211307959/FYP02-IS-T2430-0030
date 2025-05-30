@@ -958,7 +958,7 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle>Profitable Products</CardTitle>
               <CardDescription>Top profitable products</CardDescription>
-              <div className="flex justify-between mt-2">
+              <div className="flex justify-end mt-2">
                 <Button 
                   variant="outline" 
                   size="sm" 

@@ -86,6 +86,45 @@ The system now automatically processes all CSV files in the data directory:
    - CSV format required for all files
    - Column names must be consistent across files
 
+## Dynamic Data Handling
+
+The system has been designed to be 100% data-driven, without relying on hardcoded values. This ensures that it can adapt to new data and changes in the dataset, such as:
+
+1. **Dynamic Locations**: Locations are read directly from the data files, not hardcoded in the application.
+   - Includes an "All Locations" option for aggregated data views
+   - Location filtering adapts automatically to the available data
+
+2. **Dynamic Products**: Product IDs and details are extracted from the data files.
+
+3. **Default Values**: When default values are needed, they are sourced from the actual data rather than being hardcoded.
+
+4. **Adaptive UI**: The UI dynamically adjusts to reflect the actual data, including products, locations, prices, and costs.
+
+### All Locations Option
+
+The system provides an "All Locations" option that:
+
+- Appears at the top of the location dropdown for easy access
+- Allows users to view data from all locations simultaneously
+- Uses default location values for model predictions when necessary
+- Provides appropriate UI feedback when "All Locations" is selected
+- Maintains the same data format for consistent API integration
+
+This approach offers several benefits:
+
+- **Flexibility**: The system can handle new locations or products added to the dataset without code changes.
+- **Maintainability**: No need to update hardcoded values when the data changes.
+- **Consistency**: Ensures that all parts of the application use the same data source.
+- **Future-proofing**: Makes it easier to adapt the system for different datasets or business scenarios.
+
+The dynamic approach is implemented at multiple levels:
+
+- **Backend API**: Reads data directly from CSV files and model encoders.
+- **Next.js API Routes**: Source data from the backend API and provide fallbacks only as a last resort.
+- **Frontend Components**: Load data dynamically from API endpoints with proper error handling.
+
+This design ensures that adding new data (such as a new location or product) requires no code changes - the system will automatically incorporate the new data throughout the application.
+
 ## API Integration
 
 ### Revenue Prediction

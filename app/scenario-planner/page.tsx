@@ -21,10 +21,10 @@ export default function ScenarioPlannerPage() {
   // Initial data will be updated from API
   const [productAverages, setProductAverages] = useState<Record<string, {price: number, cost: number}>>({});
 
-  // Initial scenario data
+  // Initial scenario data - completely empty, will be populated from API data
   const initialScenario = {
-    locationId: "North",
-    productId: "12", // Use numeric ID directly as string
+    locationId: "",
+    productId: "",
     unitCost: 0,
     unitPrice: 0,
   }
@@ -55,45 +55,33 @@ export default function ScenarioPlannerPage() {
       
       productData.forEach((product: any) => {
         // Use the productId directly as the key (as a string)
+        // Format price and cost to 2 decimal places
         productMap[product.productId.toString()] = {
-          price: product.price,
-          cost: product.cost
+          price: Math.round(product.price * 100) / 100,
+          cost: Math.round(product.cost * 100) / 100
         };
       });
       
+      // Update the product averages state
       setProductAverages(productMap);
       
       // If we have a selected product, update its price and cost
       if (simulatedScenario.productId && productMap[simulatedScenario.productId]) {
         const selectedProductData = productMap[simulatedScenario.productId];
         
+        // Format to 2 decimal places
+        const price = Math.round(selectedProductData.price * 100) / 100;
+        const cost = Math.round(selectedProductData.cost * 100) / 100;
+        
         setSimulatedScenario(prev => ({
           ...prev,
-          unitPrice: selectedProductData.price,
-          unitCost: selectedProductData.cost
+          unitPrice: price,
+          unitCost: cost
         }));
         
         setAverageStats({
-          price: selectedProductData.price,
-          cost: selectedProductData.cost
-        });
-      }
-      // If no product is selected but we have product data, use the first one
-      else if (productData.length > 0) {
-        const firstProductId = productData[0].productId.toString();
-        const updatedScenario = {
-          ...simulatedScenario, 
-          productId: firstProductId,
-          unitCost: productMap[firstProductId].cost,
-          unitPrice: productMap[firstProductId].price
-        };
-        
-        setOriginalScenario(updatedScenario);
-        setSimulatedScenario(updatedScenario);
-        
-        setAverageStats({
-          price: productMap[firstProductId].price,
-          cost: productMap[firstProductId].cost
+          price: price,
+          cost: cost
         });
       }
       
@@ -101,6 +89,9 @@ export default function ScenarioPlannerPage() {
         title: "Product data loaded",
         description: `Loaded data from ${response.source || "data file"}`,
       });
+      
+      // Return the product map for potential use by the caller
+      return productMap;
       
     } catch (err) {
       console.error("Error loading product data:", err);
@@ -111,6 +102,10 @@ export default function ScenarioPlannerPage() {
         title: "Error loading product data",
         description: "Failed to load product price and cost data from the file.",
       });
+      
+      // Return empty map on error
+      return {};
+      
     } finally {
       setIsLoading(false);
     }
@@ -122,6 +117,9 @@ export default function ScenarioPlannerPage() {
       setIsLoadingOptions(true)
       
       try {
+        // Load product price and cost data first to have the averages available
+        await loadProductData();
+        
         // Fetch products
         const productsData = await getProducts()
         
@@ -137,8 +135,42 @@ export default function ScenarioPlannerPage() {
         const locationsData = await getLocations()
         setLocations(locationsData)
         
-        // Load product price and cost data
-        await loadProductData();
+        // Set default values only after data is loaded
+        if (mappedProducts.length > 0 && locationsData.length > 0) {
+          console.log("Setting default product and location from loaded data");
+          
+          // Select first product and location as defaults
+          const defaultLocationId = locationsData[0].id;
+          const defaultProductId = mappedProducts[0].id;
+          
+          // Get product averages from the current state
+          const currentProductAverages = { ...productAverages };
+          
+          // Check if we have price/cost data for this product
+          let defaultPrice = 0;
+          let defaultCost = 0;
+          
+          if (currentProductAverages[defaultProductId]) {
+            defaultPrice = Math.round(currentProductAverages[defaultProductId].price * 100) / 100;
+            defaultCost = Math.round(currentProductAverages[defaultProductId].cost * 100) / 100;
+          }
+          
+          const defaultScenario = {
+            locationId: defaultLocationId,
+            productId: defaultProductId,
+            unitPrice: defaultPrice,
+            unitCost: defaultCost
+          };
+          
+          setOriginalScenario(defaultScenario);
+          setSimulatedScenario(defaultScenario);
+          
+          // Also update average stats
+          setAverageStats({
+            price: defaultPrice,
+            cost: defaultCost
+          });
+        }
       } catch (err) {
         console.error("Error loading options:", err)
         setError("Failed to load product and location options")
@@ -166,15 +198,29 @@ export default function ScenarioPlannerPage() {
     return () => {
       window.removeEventListener('dataFileChanged', handleDataFileChanged);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Handle input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setSimulatedScenario((prev) => ({
-      ...prev,
-      [name]: Number.parseFloat(value) || 0,
-    }))
+    
+    // Format to 2 decimal places for price and cost fields
+    if (name === 'unitPrice' || name === 'unitCost') {
+      const numValue = Number.parseFloat(value) || 0;
+      // Round to 2 decimal places
+      const formattedValue = Math.round(numValue * 100) / 100;
+      
+      setSimulatedScenario((prev) => ({
+        ...prev,
+        [name]: formattedValue,
+      }))
+    } else {
+      setSimulatedScenario((prev) => ({
+        ...prev,
+        [name]: Number.parseFloat(value) || 0,
+      }))
+    }
   }
 
   // Handle select changes
@@ -183,13 +229,17 @@ export default function ScenarioPlannerPage() {
     
     // If product changes, update price and cost to match product average
     if (name === 'productId' && productAverages[value]) {
-      updateObj.unitPrice = productAverages[value].price;
-      updateObj.unitCost = productAverages[value].cost;
+      // Format to 2 decimal places
+      const price = Math.round(productAverages[value].price * 100) / 100;
+      const cost = Math.round(productAverages[value].cost * 100) / 100;
+      
+      updateObj.unitPrice = price;
+      updateObj.unitCost = cost;
       
       // Also update average stats
       setAverageStats({
-        price: productAverages[value].price,
-        cost: productAverages[value].cost
+        price: price,
+        cost: cost
       });
     }
     
@@ -205,8 +255,23 @@ export default function ScenarioPlannerPage() {
     setError("")
     
     try {
+      // Validate required fields first
+      if (!simulatedScenario.locationId) {
+        throw new Error("Please select a location before simulating");
+      }
+      
+      if (!simulatedScenario.productId) {
+        throw new Error("Please select a product before simulating");
+      }
+      
       // Map the frontend data structure to the format expected by the API
       const baseData = mapToApiOrderFormat(simulatedScenario)
+      
+      // Add current date values if missing
+      const today = new Date();
+      if (!baseData.Month) baseData.Month = today.getMonth() + 1; // Months are 0-indexed in JS
+      if (!baseData.Day) baseData.Day = today.getDate();
+      if (!baseData.Year) baseData.Year = today.getFullYear();
       
       console.log('Simulating with data:', baseData);
       
@@ -230,10 +295,24 @@ export default function ScenarioPlannerPage() {
         setScenarioResults(resultsArray);
         setIsSimulated(true);
         
-        toast({
-          title: "Scenarios simulated",
-          description: "The quantity and revenue predictions have been updated based on your changes.",
-        });
+        // Show a note if provided in the API response
+        if (apiResponse?.note) {
+          toast({
+            title: "Scenarios simulated",
+            description: apiResponse.note,
+          });
+        } else if (simulatedScenario.locationId === 'All') {
+          // Fallback for "All Locations" if no note in response
+          toast({
+            title: "Scenarios simulated",
+            description: "Using combined location data. Results represent the sum across all regions.",
+          });
+        } else {
+          toast({
+            title: "Scenarios simulated",
+            description: "The quantity and revenue predictions have been updated based on your changes.",
+          });
+        }
       } catch (fetchError) {
         clearTimeout(timeoutId);
         
@@ -302,8 +381,8 @@ export default function ScenarioPlannerPage() {
     // Set proper values based on product averages
     const resetScenario = {
       ...simulatedScenario,
-      unitPrice: productAvg ? productAvg.price : 0,
-      unitCost: productAvg ? productAvg.cost : 0
+      unitPrice: productAvg ? Math.round(productAvg.price * 100) / 100 : 0,
+      unitCost: productAvg ? Math.round(productAvg.cost * 100) / 100 : 0
     };
     
     setSimulatedScenario(resetScenario);
@@ -314,8 +393,8 @@ export default function ScenarioPlannerPage() {
     // Update average stats
     if (productAvg) {
       setAverageStats({
-        price: productAvg.price,
-        cost: productAvg.cost
+        price: Math.round(productAvg.price * 100) / 100,
+        cost: Math.round(productAvg.cost * 100) / 100
       });
     }
 
@@ -327,10 +406,38 @@ export default function ScenarioPlannerPage() {
 
   // Apply the simulated scenario
   const applyScenario = () => {
-    toast({
-      title: "Scenario applied",
-      description: "The simulated scenario has been applied as the new baseline.",
-    })
+    // Get the optimal scenario from results (highest profit)
+    const optimalScenario = [...scenarioResults].sort((a, b) => {
+      const profitA = a.Profit || a.profit || 0;
+      const profitB = b.Profit || b.profit || 0;
+      return profitB - profitA; // Sort descending
+    })[0];
+    
+    if (optimalScenario) {
+      // Get the price from the optimal scenario
+      const optimalPrice = optimalScenario['Unit Price'] || 100;
+      
+      // Update the simulated scenario with the optimal price
+      setSimulatedScenario(prev => ({
+        ...prev,
+        unitPrice: optimalPrice
+      }));
+      
+      // Re-simulate with the optimal price
+      setTimeout(() => {
+        simulateRevenue();
+      }, 100);
+      
+      toast({
+        title: "Optimal scenario applied",
+        description: `Applied the highest profit scenario with price $${optimalPrice.toFixed(2)}.`,
+      });
+    } else {
+      toast({
+        title: "Scenario applied",
+        description: "The simulated scenario has been applied as the new baseline.",
+      });
+    }
   }
 
   // Prepare chart data from scenario results
@@ -344,17 +451,42 @@ export default function ScenarioPlannerPage() {
           name: "Current",
           revenue: 0,
           profit: 0,
-          quantity: 0
+          quantity: 0,
+          raw_quantity: 0
         }
       ]
     }
+    
     // Map backend keys to frontend keys
-    return safeResults.map(result => ({
+    const chartData = safeResults.map(result => ({
       name: result.Scenario || result.scenario,
       revenue: result["Predicted Revenue"] ?? result.predicted_revenue ?? 0,
       profit: result.Profit ?? result.profit ?? 0,
-      quantity: result["Predicted Quantity"] ?? result.predicted_quantity ?? 0
-    }))
+      quantity: result["Predicted Quantity"] ?? result.predicted_quantity ?? 0,
+      raw_quantity: result["raw_quantity"] ?? result["Predicted Quantity"] ?? result.predicted_quantity ?? 0
+    }));
+    
+    // Check if we need to scale the quantity for better visualization
+    // This is needed when the quantity is much lower than revenue/profit
+    const maxQuantity = Math.max(...chartData.map(item => item.quantity));
+    const maxRevenue = Math.max(...chartData.map(item => item.revenue));
+    
+    // If quantity is less than 5% of revenue, scale it for better visibility
+    if (maxQuantity > 0 && maxRevenue > 0 && maxQuantity < maxRevenue * 0.05) {
+      // Scale factor to make quantity approximately 1/3 of max revenue
+      const scaleFactor = (maxRevenue / 3) / maxQuantity;
+      
+      // Apply scaling for display purposes only
+      return chartData.map(item => ({
+        ...item,
+        // Store original quantity in raw_quantity if not already present
+        raw_quantity: item.raw_quantity || item.quantity,
+        // Use scaled quantity only for display
+        quantity: item.quantity * scaleFactor
+      }));
+    }
+    
+    return chartData;
   }
 
   // Reload product data to get the latest values from the data file
@@ -421,6 +553,11 @@ export default function ScenarioPlannerPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {simulatedScenario.locationId === 'All' && (
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">
+                    "All Locations" will simulate using data summed across all regions.
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-1 sm:gap-2">
@@ -451,7 +588,7 @@ export default function ScenarioPlannerPage() {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={simulatedScenario.unitPrice}
+                  value={simulatedScenario.unitPrice.toFixed(2)}
                   onChange={handleInputChange}
                   className="text-xs sm:text-sm h-8 sm:h-10"
                 />
@@ -468,7 +605,7 @@ export default function ScenarioPlannerPage() {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={simulatedScenario.unitCost}
+                  value={simulatedScenario.unitCost.toFixed(2)}
                   onChange={handleInputChange}
                   className="text-xs sm:text-sm h-8 sm:h-10"
                 />
@@ -529,49 +666,56 @@ export default function ScenarioPlannerPage() {
                     tickFormatter={(value) => `$${value > 999 ? `${(value/1000).toFixed(1)}k` : value}`}
                   />
                   <ChartTooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <ChartTooltipContent
-                            content={
-                              <div className="grid gap-1 sm:gap-2">
-                                <div className="flex items-center gap-1 sm:gap-2">
-                                  <div className="bg-blue-500 rounded-full w-2 sm:w-3 h-2 sm:h-3" />
-                                  <div className="grid gap-0 sm:gap-1">
-                                    <div className="text-[10px] sm:text-xs">Revenue</div>
-                                    <div className="text-xs sm:text-sm">${payload[0].value?.toFixed(2)}</div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-1 sm:gap-2">
-                                  <div className="bg-green-500 rounded-full w-2 sm:w-3 h-2 sm:h-3" />
-                                  <div className="grid gap-0 sm:gap-1">
-                                    <div className="text-[10px] sm:text-xs">Profit</div>
-                                    <div className="text-xs sm:text-sm">${payload[1].value?.toFixed(2)}</div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-1 sm:gap-2">
-                                  <div className="bg-amber-500 rounded-full w-2 sm:w-3 h-2 sm:h-3" />
-                                  <div className="grid gap-0 sm:gap-1">
-                                    <div className="text-[10px] sm:text-xs">Quantity</div>
-                                    <div className="text-xs sm:text-sm">{payload[2].value}</div>
-                                  </div>
-                                </div>
-                              </div>
-                            }
-                          />
-                        )
+                    formatter={(value, name) => {
+                      // Format values with 2 decimal places for currency values
+                      if (name === 'Revenue' || name === 'Profit') {
+                        return [`$${value.toFixed(2)}`, name];
                       }
-                      return null
+                      
+                      // For quantity, find the original datapoint to get raw_quantity if available
+                      if (name === 'Quantity') {
+                        // Get the current chart data
+                        const currentData = getChartData();
+                        // Find the item with this value or close to it (floating point comparison)
+                        const currentItem = currentData.find(item => Math.abs(item.quantity - value) < 0.001);
+                        
+                        // Use raw_quantity if available, otherwise use the value
+                        const actualQuantity = currentItem?.raw_quantity !== undefined ? 
+                                              currentItem.raw_quantity : 
+                                              value;
+                        
+                        // Format as integer with comma separation for thousands
+                        return [Math.round(actualQuantity).toLocaleString(), name];
+                      }
+                      
+                      // Default case
+                      return [value.toLocaleString(), name];
                     }}
+                    labelFormatter={(label) => `Scenario: ${label}`}
                   />
                   <Legend 
                     wrapperStyle={{fontSize: '0.7rem'}}
                     iconSize={8}
                     iconType="circle"
                   />
-                  <Bar dataKey="revenue" fill="#3b82f6" name="Revenue" />
-                  <Bar dataKey="profit" fill="#22c55e" name="Profit" />
-                  <Bar dataKey="quantity" fill="#eab308" name="Quantity" />
+                  <Bar 
+                    dataKey="revenue" 
+                    fill="#3b82f6" 
+                    name="Revenue" 
+                    isAnimationActive={true}
+                  />
+                  <Bar 
+                    dataKey="profit" 
+                    fill="#22c55e" 
+                    name="Profit" 
+                    isAnimationActive={true}
+                  />
+                  <Bar 
+                    dataKey="quantity" 
+                    fill="#eab308" 
+                    name="Quantity" 
+                    isAnimationActive={true}
+                  />
                 </BarChart>
               </ChartContainer>
             </ResponsiveContainer>
