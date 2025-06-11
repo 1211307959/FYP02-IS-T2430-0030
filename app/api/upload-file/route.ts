@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Save the file to a temporary location
-    const dataDir = path.join(process.cwd(), 'data');
+    const dataDir = path.join(process.cwd(), 'public', 'data');
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }

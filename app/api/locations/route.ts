@@ -2,12 +2,27 @@ import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 
+// In-memory cache for responses to avoid duplicate processing during development
+let responseCache: {
+  data: any;
+  timestamp: number;
+} | null = null;
+
+// Cache validity period (5 minutes)
+const CACHE_TTL = 5 * 60 * 1000;
+
 export async function GET() {
   try {
+    // Check if we have a valid cached response
+    const now = Date.now();
+    if (responseCache && now - responseCache.timestamp < CACHE_TTL) {
+      return NextResponse.json(responseCache.data);
+    }
+
     // Define base URL for the Flask API
     const apiUrl = process.env.FLASK_API_URL || 'http://localhost:5000';
     
-    // Path to the data directory
+    // Path to the data directory - updated to use root data folder
     const dataDir = path.join(process.cwd(), 'public', 'data');
     
     try {
@@ -21,21 +36,27 @@ export async function GET() {
         throw new Error('No CSV files found in data directory');
       }
       
-      // Use the first CSV file found
-      const filePath = path.join(dataDir, files[0]);
-      console.log(`Using data file for locations: ${filePath}`);
+      console.log(`Processing ${files.length} CSV files for locations`);
       
+      // Collect all unique locations from all CSV files
+      const allLocations = new Set<string>();
+      
+      for (const fileName of files) {
+      const filePath = path.join(dataDir, fileName);
+        
+        try {
       // Read the CSV file
       const fileContent = await fs.readFile(filePath, 'utf8');
       
       // Split the content into lines
-      const lines = fileContent.split('\n');
+          const lines = fileContent.split('\n').filter(line => line.trim());
+          
+          if (lines.length === 0) continue;
       
-      // Extract unique locations from the Location column
-      const locationSet = new Set<string>();
+          // Parse header line properly (handle quoted fields)
+          const header = parseCSVLine(lines[0]);
       
       // Try to find the location column
-      const header = lines[0].split(',');
       const possibleLocationColumns = ['Location', 'location', 'LOCATION', 'LocationID', 'location_id'];
       let locationColumnIndex = -1;
       
@@ -48,25 +69,32 @@ export async function GET() {
       }
       
       if (locationColumnIndex === -1) {
-        throw new Error('Location column not found in CSV header');
+            console.warn(`Location column not found in ${fileName}`);
+            continue;
       }
       
-      // Skip header line
+          // Skip header line and parse data lines
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (line) {
-          const columns = line.split(',');
+              const columns = parseCSVLine(line);
           if (columns.length > locationColumnIndex) {
             const location = columns[locationColumnIndex].trim();
-            if (location) {
-              locationSet.add(location);
+                if (location && location !== '') {
+                  allLocations.add(location);
             }
           }
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing file ${fileName}:`, error);
         }
       }
       
       // Convert to array and sort alphabetically
-      const sortedLocations = Array.from(locationSet).sort();
+      const sortedLocations = Array.from(allLocations).sort();
+      
+      console.log(`Found ${sortedLocations.length} unique locations: ${sortedLocations.join(', ')}`);
       
       // Format for the frontend, adding an "All Locations" option at the top
       const locations = [
@@ -76,6 +104,12 @@ export async function GET() {
           name: location
         }))
       ];
+      
+      // Cache the response
+      responseCache = {
+        data: locations,
+        timestamp: now
+      };
       
       return NextResponse.json(locations);
       
@@ -102,6 +136,13 @@ export async function GET() {
               name: location
             }))
           ];
+          
+          // Cache the response
+          responseCache = {
+            data: locations,
+            timestamp: now
+          };
+          
           return NextResponse.json(locations);
         } else {
           throw new Error('Invalid API response format');
@@ -109,15 +150,21 @@ export async function GET() {
       } catch (apiError: unknown) {
         console.warn(`Failed to fetch API locations: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
         
-        // Return a minimal fallback list of locations if all else fails
+        // Return a complete fallback list based on known data
         const fallbackLocations = [
           { id: 'All', name: 'All Locations' },
+          { id: 'Central', name: 'Central' },
+          { id: 'East', name: 'East' },
           { id: 'North', name: 'North' },
           { id: 'South', name: 'South' },
-          { id: 'East', name: 'East' },
-          { id: 'West', name: 'West' },
-          { id: 'Central', name: 'Central' }
+          { id: 'West', name: 'West' }
         ];
+        
+        // Cache the fallback response
+        responseCache = {
+          data: fallbackLocations,
+          timestamp: now
+        };
         
         return NextResponse.json(fallbackLocations);
       }
@@ -130,4 +177,29 @@ export async function GET() {
       { status: 500 }
     );
   }
+}
+
+// Helper function to properly parse CSV lines (handles quoted fields)
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  
+  // Add the last field
+  result.push(current);
+  
+  return result;
 } 

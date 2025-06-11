@@ -5,7 +5,7 @@ import { parse } from 'csv-parse/sync';
 
 export async function GET() {
   try {
-    // Path to the data directory
+    // Path to the data directory - updated to use root data folder
     const dataDir = path.join(process.cwd(), 'public', 'data');
     
     // Find CSV files in the directory
@@ -21,10 +21,15 @@ export async function GET() {
       throw new Error('No CSV files found in data directory');
     }
     
-    // Use the first CSV file found
-    const filePath = path.join(dataDir, files[0]);
-    console.log(`Using data file for product data: ${filePath}`);
+    console.log(`Processing ${files.length} CSV files for product data`);
     
+    // Collect data from all CSV files
+    const productMap = new Map();
+    
+    for (const fileName of files) {
+    const filePath = path.join(dataDir, fileName);
+      
+      try {
     // Read the CSV file
     const fileContent = await fs.readFile(filePath, 'utf8');
     
@@ -34,9 +39,10 @@ export async function GET() {
       skip_empty_lines: true
     });
     
-    // If no records found
+        // If no records found in this file, continue to the next
     if (!records || records.length === 0) {
-      throw new Error('No data records found in CSV file');
+          console.warn(`No data records found in ${fileName}`);
+          continue;
     }
     
     // Get product ID column name
@@ -46,7 +52,8 @@ export async function GET() {
     );
     
     if (!productIdColumn) {
-      throw new Error('Product ID column not found in CSV');
+          console.warn(`Product ID column not found in ${fileName}`);
+          continue;
     }
     
     // Get price and cost column names
@@ -58,15 +65,15 @@ export async function GET() {
     );
     
     if (!priceColumn) {
-      throw new Error('Price column not found in CSV');
+          console.warn(`Price column not found in ${fileName}`);
+          continue;
     }
     if (!costColumn) {
-      throw new Error('Cost column not found in CSV');
+          console.warn(`Cost column not found in ${fileName}`);
+          continue;
     }
     
-    // Calculate average price and cost for each product
-    const productMap = new Map();
-    
+        // Process records from this file
     for (const record of records) {
       const productId = Number(record[productIdColumn]);
       const price = Number(record[priceColumn]);
@@ -88,6 +95,17 @@ export async function GET() {
       data.count++;
       data.totalPrice += price;
       data.totalCost += cost;
+        }
+        
+        console.log(`Processed ${records.length} records from ${fileName}`);
+        
+      } catch (error) {
+        console.error(`Error processing file ${fileName}:`, error);
+      }
+    }
+    
+    if (productMap.size === 0) {
+      throw new Error('No valid product data found in any CSV files');
     }
     
     // Calculate averages and format results
@@ -100,10 +118,12 @@ export async function GET() {
     // Sort by product ID
     products.sort((a, b) => a.productId - b.productId);
     
+    console.log(`Generated product data for ${products.length} products`);
+    
     // Return product data
     return NextResponse.json({
       status: 'success',
-      source: files[0],
+      source: `Combined data from ${files.length} files`,
       products
     });
     

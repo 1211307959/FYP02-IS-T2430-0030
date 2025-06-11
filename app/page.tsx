@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { BarChart3, FileInput, Settings, BellRing, FileText, BrainCircuit, ArrowRight } from "lucide-react"
 import Link from "next/link"
 
@@ -74,15 +74,15 @@ export default function Home() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Reports</CardTitle>
-                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Sales Forecasting</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">Generate Reports</div>
+                  <div className="text-2xl font-bold">Generate Forecasts</div>
                   <p className="text-xs text-muted-foreground">Create downloadable PDF summaries of your data</p>
                   <Button asChild className="mt-4 w-full">
-                    <Link href="/reports">
-                      Create Reports <ArrowRight className="ml-2 h-4 w-4" />
+                    <Link href="/sales-forecasting">
+                      Create Forecasts <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
                 </CardContent>

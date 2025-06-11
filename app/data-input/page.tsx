@@ -13,22 +13,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, FileUp, BarChart, AlertCircle, Check, Database } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { predictRevenue, getProducts, getCustomers, loadSampleCsvData } from "@/lib/api"
+import { getProducts, getLocations, loadSampleCsvData } from "@/lib/api"
 import Papa from 'papaparse'
 
 // Define a type for our CSV row data
 type CsvRowData = {
   id?: number;
-  OrderDate?: string;
-  _CustomerID: number | string;
+  Location: string;
   _ProductID: number | string;
-  "Order Quantity": number;
   "Unit Cost": number;
   "Unit Price": number;
-  "Total Cost"?: number;
-  "Total Revenue"?: number;
-  Profit?: number;
-  "Profit Margin (%)"?: number;
+  "Total Revenue": number;
   Year?: number;
   Month: number;
   Day: number;
@@ -45,23 +40,23 @@ export default function DataInputPage() {
   const [formData, setFormData] = useState({
     unitCost: "",
     unitPrice: "",
-    orderQuantity: "",
+    totalRevenue: "",
     month: "",
     day: "",
     weekday: "",
-    customerId: "",
+    location: "",
     productId: "",
   })
 
-  // State for products and customers
+  // State for products and locations
   const [products, setProducts] = useState<{id: string, name: string}[]>([])
-  const [customers, setCustomers] = useState<{id: string, name: string}[]>([])
+  const [locations, setLocations] = useState<{id: string, name: string}[]>([])
   const [isLoadingOptions, setIsLoadingOptions] = useState(true)
   const [error, setError] = useState("")
   const [predictionResults, setPredictionResults] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   
-  // Fetch products and customers from API
+  // Fetch products and locations from API
   useEffect(() => {
     const fetchOptions = async () => {
       setIsLoadingOptions(true)
@@ -71,12 +66,12 @@ export default function DataInputPage() {
         const productsData = await getProducts()
         setProducts(productsData)
         
-        // Fetch customers
-        const customersData = await getCustomers()
-        setCustomers(customersData)
+        // Fetch locations
+        const locationsData = await getLocations()
+        setLocations(locationsData)
       } catch (err) {
         console.error("Error loading options:", err)
-        setError("Failed to load product and customer options")
+        setError("Failed to load product and location options")
       } finally {
         setIsLoadingOptions(false)
       }
@@ -157,7 +152,7 @@ export default function DataInputPage() {
     
     try {
       // Validate all required fields are present
-      const requiredFields = ['unitCost', 'unitPrice', 'orderQuantity', 'month', 'day', 'weekday', 'customerId', 'productId']
+      const requiredFields = ['unitCost', 'unitPrice', 'totalRevenue', 'month', 'day', 'weekday', 'location', 'productId']
       const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData])
       
       if (missingFields.length > 0) {
@@ -167,15 +162,15 @@ export default function DataInputPage() {
       // Create new entry for preview data
       const newEntry: CsvRowData = {
       id: previewData.length + 1,
-        _CustomerID: formData.customerId,
+        Location: formData.location,
         _ProductID: formData.productId,
-        "Order Quantity": Number(formData.orderQuantity),
         "Unit Cost": Number(formData.unitCost),
         "Unit Price": Number(formData.unitPrice),
+        "Total Revenue": Number(formData.totalRevenue),
+        Year: new Date().getFullYear(),
         Month: Number(formData.month),
         Day: Number(formData.day),
         Weekday: formData.weekday,
-        "Total Cost": Number(formData.unitCost) * Number(formData.orderQuantity),
     }
 
     setPreviewData([...previewData, newEntry])
@@ -189,11 +184,11 @@ export default function DataInputPage() {
     setFormData({
       unitCost: "",
       unitPrice: "",
-      orderQuantity: "",
+      totalRevenue: "",
       month: "",
       day: "",
       weekday: "",
-      customerId: "",
+      location: "",
       productId: "",
     })
     } catch (err) {
@@ -216,15 +211,13 @@ export default function DataInputPage() {
   const formatRowForPrediction = (row: CsvRowData) => {
     // The API expects specific field names
     return {
-      "_CustomerID": typeof row._CustomerID === 'string' ? 
-        parseInt(row._CustomerID.replace("CUST", "")) : 
-        row._CustomerID,
+      "Location": row.Location,
       "_ProductID": typeof row._ProductID === 'string' ? 
         parseInt(row._ProductID.replace("PROD", "")) : 
         row._ProductID,
-      "Order Quantity": row["Order Quantity"],
       "Unit Cost": row["Unit Cost"],
       "Unit Price": row["Unit Price"],
+      "Year": row.Year || new Date().getFullYear(),
       "Month": row.Month,
       "Day": row.Day,
       "Weekday": row.Weekday
@@ -252,8 +245,20 @@ export default function DataInputPage() {
       // Format the data for the API
       const orderData = formatRowForPrediction(selectedRow)
       
-      // Call the API
-      const result = await predictRevenue(orderData)
+      // Call the prediction API
+      const response = await fetch('/api/predict', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Prediction failed: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
       
       // Store the prediction results
       setPredictionResults(result)
@@ -328,11 +333,11 @@ export default function DataInputPage() {
             description: `Loaded ${dataWithIds.length} rows from sample data.`,
           })
         },
-        error: function(error) {
+        error: function(error: any) {
           setError(`Error parsing sample CSV: ${error.message}`)
         }
       })
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load sample data"
       setError(errorMessage)
       toast({
@@ -342,6 +347,48 @@ export default function DataInputPage() {
       })
     }
   }
+
+  // Add function to reload data
+  const handleReloadData = async () => {
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      const response = await fetch('/api/reload-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to reload data: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      toast({
+        title: "Data reloaded successfully",
+        description: `Loaded ${result.files_loaded} files with ${result.total_rows} total rows.`,
+      });
+      
+      // Clear current preview data to show that new data is loaded
+      setPreviewData([]);
+      setSelectedRowIndex(null);
+      setPredictionResults(null);
+      
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to reload data";
+      setError(errorMessage);
+      toast({
+        variant: "destructive",
+        title: "Failed to reload data",
+        description: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Add this function after the handleClearFile function and before the return statement
   const handleUploadToServer = async (file: File) => {
@@ -376,7 +423,7 @@ export default function DataInputPage() {
         fileInputRef.current.value = ""
       }
       
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to upload file to server"
       setError(errorMessage)
       toast({
@@ -411,10 +458,6 @@ export default function DataInputPage() {
             <FileUp className="mr-2 h-4 w-4" />
             Manual Entry
           </TabsTrigger>
-          <TabsTrigger className="flex-grow text-xs sm:text-sm" value="revenue-prediction">
-            <BarChart className="mr-2 h-4 w-4" />
-            Revenue Prediction
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="file-upload" className="space-y-4">
@@ -430,12 +473,12 @@ export default function DataInputPage() {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex-1">
                     <Label htmlFor="file-upload" className="text-xs sm:text-sm">Select CSV File</Label>
-                    <Input
-                      id="file-upload"
-                      type="file"
-                      accept=".csv"
+                  <Input 
+                    id="file-upload" 
+                    type="file" 
+                    accept=".csv" 
                       ref={fileInputRef}
-                      onChange={handleFileChange}
+                    onChange={handleFileChange} 
                       className="mt-1 text-xs sm:text-sm h-9 sm:h-10"
                     />
                   </div>
@@ -459,11 +502,21 @@ export default function DataInputPage() {
                     >
                       <Database className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />
                       Load Sample
+                      </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      onClick={handleReloadData}
+                      className="text-xs sm:text-sm h-9 sm:h-10"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Reloading..." : "Reload Data"}
                     </Button>
                   </div>
                 </div>
 
-                {file && (
+                  {file && (
                   <div className="mt-2">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Check className="h-4 w-4 text-green-500" />
@@ -471,8 +524,8 @@ export default function DataInputPage() {
                         {file.name} ({(file.size / 1024).toFixed(1)} KB)
                       </span>
                     </div>
-                  </div>
-                )}
+                    </div>
+                  )}
               </div>
             </CardContent>
             <CardFooter className="p-4 sm:p-6 flex flex-col sm:flex-row justify-end gap-2">
@@ -570,35 +623,35 @@ export default function DataInputPage() {
                   </div>
 
                   <div className="grid gap-1 sm:gap-2">
-                    <Label htmlFor="customerId" className="text-xs sm:text-sm">Customer</Label>
+                    <Label htmlFor="location" className="text-xs sm:text-sm">Location</Label>
                     <Select
-                      value={formData.customerId}
-                      onValueChange={(value) => handleSelectChange("customerId", value)}
+                      value={formData.location}
+                      onValueChange={(value) => handleSelectChange("location", value)}
                       disabled={isLoadingOptions}
                     >
-                      <SelectTrigger id="customerId" className="text-xs sm:text-sm h-8 sm:h-10">
-                        <SelectValue placeholder="Select a customer" />
+                      <SelectTrigger id="location" className="text-xs sm:text-sm h-8 sm:h-10">
+                        <SelectValue placeholder="Select a location" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[40vh]">
-                        {customers.map((customer) => (
-                          <SelectItem key={customer.id} value={customer.id} className="text-xs sm:text-sm">
-                            {customer.name}
+                        {locations.map((location) => (
+                          <SelectItem key={location.id} value={location.id} className="text-xs sm:text-sm">
+                            {location.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                </div>
 
                   <div className="grid gap-1 sm:gap-2">
                     <Label htmlFor="unitPrice" className="text-xs sm:text-sm">Unit Price ($)</Label>
-                    <Input
-                      id="unitPrice"
-                      name="unitPrice"
-                      type="number"
-                      step="0.01"
+                  <Input
+                    id="unitPrice"
+                    name="unitPrice"
+                    type="number"
+                    step="0.01"
                       min="0"
-                      value={formData.unitPrice}
-                      onChange={handleInputChange}
+                    value={formData.unitPrice}
+                    onChange={handleInputChange}
                       className="text-xs sm:text-sm h-8 sm:h-10"
                     />
                   </div>
@@ -614,21 +667,22 @@ export default function DataInputPage() {
                       value={formData.unitCost}
                       onChange={handleInputChange}
                       className="text-xs sm:text-sm h-8 sm:h-10"
-                    />
-                  </div>
+                  />
+                </div>
 
                   <div className="grid gap-1 sm:gap-2">
-                    <Label htmlFor="orderQuantity" className="text-xs sm:text-sm">Quantity</Label>
-                    <Input
-                      id="orderQuantity"
-                      name="orderQuantity"
-                      type="number"
-                      min="1"
-                      value={formData.orderQuantity}
-                      onChange={handleInputChange}
+                    <Label htmlFor="totalRevenue" className="text-xs sm:text-sm">Total Revenue ($)</Label>
+                  <Input
+                    id="totalRevenue"
+                    name="totalRevenue"
+                    type="number"
+                      min="0"
+                      step="0.01"
+                    value={formData.totalRevenue}
+                    onChange={handleInputChange}
                       className="text-xs sm:text-sm h-8 sm:h-10"
-                    />
-                  </div>
+                  />
+                </div>
 
                   <div className="grid gap-1 sm:gap-2">
                     <Label htmlFor="month" className="text-xs sm:text-sm">Month</Label>
@@ -637,31 +691,31 @@ export default function DataInputPage() {
                       onValueChange={(value) => handleSelectChange("month", value)}
                     >
                       <SelectTrigger id="month" className="text-xs sm:text-sm h-8 sm:h-10">
-                        <SelectValue placeholder="Select month" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {monthOptions.map((month) => (
+                      <SelectValue placeholder="Select month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monthOptions.map((month) => (
                           <SelectItem key={month.value} value={month.value} className="text-xs sm:text-sm">
-                            {month.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                          {month.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
                   <div className="grid gap-1 sm:gap-2">
                     <Label htmlFor="day" className="text-xs sm:text-sm">Day</Label>
-                    <Input
-                      id="day"
-                      name="day"
-                      type="number"
-                      min="1"
-                      max="31"
-                      value={formData.day}
-                      onChange={handleInputChange}
+                  <Input
+                    id="day"
+                    name="day"
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={formData.day}
+                    onChange={handleInputChange}
                       className="text-xs sm:text-sm h-8 sm:h-10"
-                    />
-                  </div>
+                  />
+                </div>
 
                   <div className="grid gap-1 sm:gap-2">
                     <Label htmlFor="weekday" className="text-xs sm:text-sm">Weekday</Label>
@@ -670,9 +724,9 @@ export default function DataInputPage() {
                       onValueChange={(value) => handleSelectChange("weekday", value)}
                     >
                       <SelectTrigger id="weekday" className="text-xs sm:text-sm h-8 sm:h-10">
-                        <SelectValue placeholder="Select weekday" />
-                      </SelectTrigger>
-                      <SelectContent>
+                      <SelectValue placeholder="Select weekday" />
+                    </SelectTrigger>
+                    <SelectContent>
                         <SelectItem value="Monday" className="text-xs sm:text-sm">Monday</SelectItem>
                         <SelectItem value="Tuesday" className="text-xs sm:text-sm">Tuesday</SelectItem>
                         <SelectItem value="Wednesday" className="text-xs sm:text-sm">Wednesday</SelectItem>
@@ -680,82 +734,19 @@ export default function DataInputPage() {
                         <SelectItem value="Friday" className="text-xs sm:text-sm">Friday</SelectItem>
                         <SelectItem value="Saturday" className="text-xs sm:text-sm">Saturday</SelectItem>
                         <SelectItem value="Sunday" className="text-xs sm:text-sm">Sunday</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    </SelectContent>
+                  </Select>
+                </div>
                 </div>
               </CardContent>
               <CardFooter className="p-4 sm:p-6 flex justify-end">
                 <Button type="submit" className="w-full sm:w-auto text-xs sm:text-sm">Add Entry</Button>
               </CardFooter>
-            </form>
+              </form>
           </Card>
         </TabsContent>
 
-        <TabsContent value="revenue-prediction" className="space-y-4">
-          <Card>
-            <CardHeader className="p-4 sm:p-6">
-              <CardTitle className="text-lg sm:text-xl">Revenue Prediction</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">
-                Predict revenue for the selected entry or make custom predictions.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
-              <div className="grid gap-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
-                  <div className="text-sm">
-                    {selectedRowIndex !== null ? (
-                      <p>
-                        Selected entry: <span className="font-medium">#{previewData[selectedRowIndex]?.id}</span>
-                      </p>
-                    ) : previewData.length > 0 ? (
-                      <p>Using the most recent entry for prediction.</p>
-                    ) : (
-                      <p>No data available. Please upload a file or add entries.</p>
-                    )}
-                  </div>
-                  <Button
-                    onClick={handlePredictRevenue}
-                    disabled={previewData.length === 0 || isLoading}
-                    className="text-xs sm:text-sm h-8 sm:h-10"
-                  >
-                    {isLoading ? "Predicting..." : "Predict Revenue"}
-                  </Button>
-                </div>
 
-                {predictionResults && (
-                  <Card className="mt-4 bg-muted/50">
-                    <CardHeader className="p-4">
-                      <CardTitle className="text-base">Prediction Results</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        <div className="bg-background p-3 rounded-lg">
-                          <p className="text-xs text-muted-foreground">Predicted Revenue</p>
-                          <p className="text-xl font-bold">
-                            ${parseFloat(predictionResults.revenue).toFixed(2)}
-                          </p>
-                        </div>
-                        <div className="bg-background p-3 rounded-lg">
-                          <p className="text-xs text-muted-foreground">Predicted Profit</p>
-                          <p className="text-xl font-bold">
-                            ${parseFloat(predictionResults.profit).toFixed(2)}
-                          </p>
-                        </div>
-                        <div className="bg-background p-3 rounded-lg">
-                          <p className="text-xs text-muted-foreground">Predicted Quantity</p>
-                          <p className="text-xl font-bold">
-                            {predictionResults.quantity}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   )

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, FileInput, Home, LineChart, Settings, BellRing, FileText, BrainCircuit } from "lucide-react"
+import { BarChart3, FileInput, Home, LineChart, Settings, BellRing, FileText, BrainCircuit, BarChart2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
@@ -44,10 +44,10 @@ export function AppSidebar() {
       isActive: pathname === "/scenario-planner",
     },
     {
-      title: "Reports",
-      icon: FileText,
-      href: "/reports",
-      isActive: pathname === "/reports",
+      title: "Sales Forecasting",
+      icon: BarChart2,
+      href: "/sales-forecasting",
+      isActive: pathname === "/sales-forecasting",
     },
     {
       title: "Insights",

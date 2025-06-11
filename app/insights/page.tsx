@@ -730,8 +730,8 @@ function generateActionableInsights(data: any) {
             severity: severity
           });
         }
-      }
     }
+  }
 }
 
   // 2. Product Mix Insights
@@ -1018,283 +1018,107 @@ function generateActionableInsights(data: any) {
   return insights;
 }
 
-// Updated to be more data-driven with no invented metrics
+// Updated to use dynamic backend data
 function getDetailedAnalysis(insight: any): string {
   if (!insight) return '';
   
-  // Generate detailed analysis based on insight category and available metrics
-  if (insight.category === "Regional Strategy") {
-    if (!insight.metrics) return 'Analysis requires location data.';
-    
-    const topLocationText = insight.metrics.topLocationRevenue || 'significant percentage';
-    const locationCount = insight.metrics.locationCount || 'few';
-    
-    return `Your business shows ${insight.metrics.concentration ? `a ${insight.metrics.concentration} concentration` : 'a concentration'} with ${topLocationText} of revenue coming from ${locationCount} locations. This analysis is based on actual location revenue data, showing the relative importance of different regions to your business.`;
-  } 
-  else if (insight.category === "Revenue Trend") {
-    if (!insight.metrics) return 'Analysis requires revenue trend data.';
-    
-    if (insight.type === "destructive" || insight.type === "warning") {
-      const declineRate = insight.metrics.declineRate || 'a significant';
-      return `Your revenue has declined by ${declineRate} over the analyzed period. This assessment is based on actual month-to-month revenue data showing a consistent downward trend that requires attention.`;
-    } else {
-      const growthRate = insight.metrics.growthRate || 'a positive';
-      return `Your business is experiencing positive growth momentum with ${growthRate} increase in revenue. This assessment is based on actual month-to-month revenue data showing a consistent upward trend.`;
-    }
-  } 
-  else if (insight.category === "Product Management") {
-    if (!insight.metrics) return 'Analysis requires product margin data.';
-    
-    const marginSpread = insight.metrics.marginSpread || 'a significant';
-    return `Your product portfolio shows a profit margin spread of ${marginSpread}, indicating opportunities for optimization. This assessment is based on actual profit margin data across your product lines, revealing significant differences in profitability.`;
-  } 
-  else if (insight.category === "Planning") {
-    if (!insight.metrics) return 'Analysis requires seasonal revenue data.';
-    
-    const peakMonth = insight.metrics.peakMonth || 'certain periods';
-    const troughMonth = insight.metrics.troughMonth || 'other periods';
-    const seasonalityStrength = insight.metrics.seasonalityStrength || 'notable';
-    
-    return `Your business shows seasonal patterns with peak performance in ${peakMonth} and lower performance in ${troughMonth}. The seasonality strength is ${seasonalityStrength}. This assessment is based on actual monthly revenue data, revealing clear seasonal patterns in your business.`;
-  } 
-  else {
-    return `This insight is based on analysis of your business data, revealing an opportunity that warrants attention.`;
+  // Use the detailed_analysis from backend if available
+  if (insight.detailed_analysis) {
+    return insight.detailed_analysis;
   }
+  
+  // Fallback to default
+  return `This insight is based on analysis of your business data, revealing an opportunity that warrants attention.`;
 }
 
-// Update the getInsightKPIs function to be data-driven
+// Function to strip markdown formatting
+function stripMarkdown(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\*\*/g, '') // Remove ** bold formatting
+    .replace(/\*/g, '')   // Remove * italic formatting
+    .replace(/#{1,6}\s/g, '') // Remove # headers
+    .replace(/`/g, '')    // Remove ` code formatting
+    .trim();
+}
+
+// Updated to use dynamic backend data
 function getInsightKPIs(insight: any) {
-  if (!insight || !insight.metrics) return [];
+  if (!insight) return [];
   
-  // Generate KPIs based on insight category and available metrics
-  if (insight.category === "Regional Strategy") {
-    const kpis = [];
-    
-    if (insight.metrics.topLocationRevenue) {
-      kpis.push({ 
-        name: "Location Revenue Concentration", 
-        current: insight.metrics.topLocationRevenue, 
-        target: parseFloat(insight.metrics.topLocationRevenue) > 60 ? "Below 60%" : "Maintain current level" 
-      });
-    }
-    
-    if (insight.metrics.locationCount) {
-      kpis.push({ 
-        name: "Key Location Count", 
-        current: insight.metrics.locationCount.toString(), 
-        target: "Maintain focus on key locations" 
-      });
-    }
-    
-    if (insight.metrics.concentration) {
-      kpis.push({ 
-        name: "Top Location Concentration", 
-        current: insight.metrics.concentration, 
-        target: parseFloat(insight.metrics.concentration) > 40 ? "Below 40%" : "Monitor for changes" 
-      });
-    }
-    
-    return kpis.length > 0 ? kpis : [
-      { name: "Location Strategy", current: "Review needed", target: "Data-driven strategy" }
-    ];
-  } 
-  else if (insight.category === "Revenue Trend") {
-    const kpis = [];
-    
-    if (insight.type === "destructive" || insight.type === "warning") {
-      if (insight.metrics.declineRate) {
-        kpis.push({ 
-          name: "Revenue Trend", 
-          current: `-${insight.metrics.declineRate} (declining)`, 
-          target: "Positive growth" 
-        });
-      }
-      
-      if (insight.metrics.monthlyAvgDecline) {
-        kpis.push({ 
-          name: "Monthly Decline Rate", 
-          current: insight.metrics.monthlyAvgDecline, 
-          target: "Reverse trend" 
-        });
-      }
-    } else {
-      if (insight.metrics.growthRate) {
-        kpis.push({ 
-          name: "Revenue Growth Rate", 
-          current: `+${insight.metrics.growthRate}`, 
-          target: "Sustain growth" 
-        });
-      }
-      
-      if (insight.metrics.monthlyAvgGrowth) {
-        kpis.push({ 
-          name: "Monthly Growth Rate", 
-          current: insight.metrics.monthlyAvgGrowth, 
-          target: "Maintain or increase" 
-        });
-      }
-    }
-    
-    return kpis.length > 0 ? kpis : [
-      { name: "Revenue Performance", current: "Review needed", target: "Positive growth trend" }
-    ];
-  } 
-  else if (insight.category === "Product Management") {
-    const kpis = [];
-    
-    if (insight.metrics.marginSpread) {
-      kpis.push({ 
-        name: "Portfolio Profit Margin Spread", 
-        current: insight.metrics.marginSpread, 
-        target: "Reduce spread" 
-      });
-    }
-    
-    if (insight.metrics.revenueImpact) {
-      kpis.push({ 
-        name: "Revenue Impact", 
-        current: insight.metrics.revenueImpact, 
-        target: "Optimize mix" 
-      });
-    }
-    
-    return kpis.length > 0 ? kpis : [
-      { name: "Product Profitability", current: "Analysis needed", target: "Balanced portfolio" }
-    ];
-  } 
-  else if (insight.category === "Planning") {
-    const kpis = [];
-    
-    if (insight.metrics.seasonalityStrength) {
-      kpis.push({ 
-        name: "Seasonal Revenue Variation", 
-        current: insight.metrics.seasonalityStrength, 
-        target: parseFloat(insight.metrics.seasonalityStrength) > 1.5 ? "Below 1.5x" : "Monitor trends" 
-      });
-    }
-    
-    if (insight.metrics.peakMonth && insight.metrics.peakRevenue) {
-      kpis.push({ 
-        name: `Month ${insight.metrics.peakMonth} Performance`, 
-        current: insight.metrics.peakRevenue, 
-        target: "Optimize for peak" 
-      });
-    }
-    
-    if (insight.metrics.troughMonth && insight.metrics.troughRevenue) {
-      kpis.push({ 
-        name: `Month ${insight.metrics.troughMonth} Performance`, 
-        current: insight.metrics.troughRevenue, 
-        target: "Improve off-season" 
-      });
-    }
-    
-    return kpis.length > 0 ? kpis : [
-      { name: "Seasonal Planning", current: "Analysis needed", target: "Balanced performance" }
-    ];
-  } 
+  // Use the kpi_targets from backend if available
+  if (insight.kpi_targets && Array.isArray(insight.kpi_targets)) {
+    return insight.kpi_targets
+      .filter((kpi: any) => kpi.metric && kpi.current && kpi.target) // Filter out invalid KPIs
+      .map((kpi: any) => ({
+        name: kpi.metric || "KPI", // Use 'metric' not 'kpi'
+        current: kpi.current || "N/A",
+        target: kpi.target || "N/A"
+      }));
+  }
   
-  // Fallback for any insight type with metrics
-  return Object.entries(insight.metrics).map(([key, value]: [string, any]) => {
-    // Format the key for display
-    const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').toLowerCase();
-    const capitalizedKey = formattedKey.charAt(0).toUpperCase() + formattedKey.slice(1);
-    
-    return {
-      name: capitalizedKey,
-      current: String(value),
-      target: "Optimize"
-    };
-  });
+  // Fallback to default KPIs
+  return [
+    { name: "Performance Improvement", current: "Baseline", target: "15-25% increase" },
+    { name: "Implementation Progress", current: "0%", target: "100% within timeline" },
+    { name: "ROI Achievement", current: "0%", target: "≥ 200% within 12 months" }
+  ];
 }
 
-// Update the getDetailedImplementationSteps function to be data-driven
+// Updated to use dynamic backend data
 function getDetailedImplementationSteps(insight: any) {
   if (!insight) return [];
   
-  // Generate implementation steps based solely on the available data
-  const baseSteps = [
+  // Use the implementation_plan from backend if available
+  if (insight.implementation_plan && Array.isArray(insight.implementation_plan)) {
+    return insight.implementation_plan.map((step: any, index: number) => ({
+      step: step.step || `Step ${index + 1}`,
+      action: step.step || "Implementation Step",
+      details: step.description || "Execute this implementation step",
+      timeframe: step.timeline || "TBD"
+    }));
+  }
+  
+  // Fallback to default implementation steps
+  return [
     { 
-      step: 1, 
+      step: "Step 1", 
       action: "Analyze Current Data", 
-      details: `Review the metrics associated with this ${insight.category} insight to understand the current situation.`, 
+      details: "Review the metrics associated with this insight to understand the current situation.", 
       timeframe: "Immediate (1 week)" 
     },
     { 
-      step: 2, 
+      step: "Step 2", 
       action: "Identify Improvement Opportunities", 
       details: "Based on the data analysis, identify specific areas where improvements can be made.", 
       timeframe: "Short-term (2 weeks)" 
     },
     { 
-      step: 3, 
+      step: "Step 3", 
       action: "Develop Action Plan", 
       details: "Create a targeted plan to address the identified opportunities with clear ownership and timeline.", 
       timeframe: "Short-term (3-4 weeks)" 
     },
     { 
-      step: 4, 
+      step: "Step 4", 
       action: "Implement and Monitor", 
       details: "Execute the action plan and establish metrics to track progress and impact.", 
       timeframe: "Ongoing" 
     }
   ];
+}
+
+// Updated to use dynamic backend data
+function getExpectedOutcome(insight: any): string {
+  if (!insight) return '';
   
-  // For insights with specific metrics, add more contextual steps
-  if (insight.category === "Regional Strategy" && insight.metrics) {
-    if (insight.metrics.topLocationRevenue) {
-      const concentration = parseFloat(insight.metrics.topLocationRevenue);
-      if (concentration > 70) {
-        baseSteps[1] = {
-          step: 2,
-          action: "Diversification Planning",
-          details: `With ${insight.metrics.topLocationRevenue} of revenue concentrated in top locations, develop strategies to expand into new regions.`,
-          timeframe: "Short-term (2-4 weeks)"
-        };
-      }
-    }
-  }
-  else if (insight.category === "Revenue Trend" && insight.metrics) {
-    if (insight.type === "destructive" || insight.type === "warning") {
-      if (insight.metrics.declineRate) {
-        baseSteps[1] = {
-          step: 2,
-          action: "Revenue Recovery Planning",
-          details: `With a decline of ${insight.metrics.declineRate}, identify and address the key factors contributing to the revenue decline.`,
-          timeframe: "Immediate (1-2 weeks)"
-        };
-      }
-    } else if (insight.metrics.growthRate) {
-      baseSteps[1] = {
-        step: 2,
-        action: "Growth Acceleration",
-        details: `With growth of ${insight.metrics.growthRate}, identify factors driving success and develop plans to build on this momentum.`,
-        timeframe: "Short-term (2-3 weeks)"
-      };
-    }
-  }
-  else if (insight.category === "Product Management" && insight.metrics) {
-    if (insight.metrics.marginSpread) {
-      baseSteps[1] = {
-        step: 2,
-        action: "Portfolio Optimization",
-        details: `With a margin spread of ${insight.metrics.marginSpread}, identify strategies to improve profitability of lower-margin products.`,
-        timeframe: "Short-term (2-4 weeks)"
-      };
-    }
-  }
-  else if (insight.category === "Planning" && insight.metrics) {
-    if (insight.metrics.seasonalityStrength && insight.metrics.peakMonth && insight.metrics.troughMonth) {
-      baseSteps[1] = {
-        step: 2,
-        action: "Seasonal Strategy Development",
-        details: `With a seasonality strength of ${insight.metrics.seasonalityStrength}x between peak month ${insight.metrics.peakMonth} and low month ${insight.metrics.troughMonth}, develop strategies to optimize across seasons.`,
-        timeframe: "Short-term (2-4 weeks)"
-      };
-    }
+  // Use the expected_outcome from backend if available
+  if (insight.expected_outcome) {
+    return insight.expected_outcome;
   }
   
-  return baseSteps;
+  // Fallback to default
+  return "Successful implementation will address the identified opportunities and help optimize business performance in this area. Expected benefits include improved efficiency, enhanced competitive position, and stronger financial results.";
 }
 
 export default function InsightsPage() {
@@ -1325,14 +1149,33 @@ export default function InsightsPage() {
     const fetchInsights = async () => {
       setLoading(true);
       try {
-        const data = await getDashboardData();
+        // Fetch insights directly from the backend
+        const response = await fetch('/api/insights', {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
         
-        // Generate the insights based on the dashboard data
-        const generatedInsights = generateActionableInsights(data);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         
-        console.log("Generated insights:", generatedInsights);
+        const data = await response.json();
         
-        setInsights(generatedInsights);
+        if (data && data.status !== 'error') {
+          // Use the insights directly from the backend, but enhance them with frontend logic
+          const backendInsights = data.insights || [];
+          
+          // For now, use the backend insights directly
+          // In future, we could combine with frontend-generated insights
+          setInsights(backendInsights);
+          
+          console.log("Loaded insights:", backendInsights);
+        } else {
+          throw new Error(data?.error || 'Failed to fetch insights');
+        }
         setError(null);
       } catch (err) {
         console.error("Error fetching insights:", err);
@@ -1653,13 +1496,13 @@ export default function InsightsPage() {
                 {/* Summary section */}
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Summary</h3>
-                  <p>{selectedInsight.description}</p>
+                  <p>{stripMarkdown(selectedInsight.description)}</p>
                 </div>
                 
                 {/* Detailed Analysis section */}
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Detailed Analysis</h3>
-                  <p className="text-muted-foreground">{getDetailedAnalysis(selectedInsight)}</p>
+                  <p className="text-muted-foreground">{stripMarkdown(selectedInsight.detailed_analysis || getDetailedAnalysis(selectedInsight))}</p>
                 </div>
                 
                 {/* Key Metrics section */}
@@ -1702,45 +1545,38 @@ export default function InsightsPage() {
                   </div>
                 </div>
                 
-                {/* Implementation Plan section */}
+                {/* Recommended Action section */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-2">Implementation Plan</h3>
-                  <div className="space-y-4">
-                    {getDetailedImplementationSteps(selectedInsight).map((step) => (
-                      <div key={step.step} className="border-l-2 border-primary pl-4 ml-2">
-                        <div className="flex justify-between items-center">
-                          <h4 className="font-medium">Step {step.step}: {step.action}</h4>
-                          <span className="text-xs bg-muted px-2 py-1 rounded-full">{step.timeframe}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">{step.details}</p>
-                      </div>
-                    ))}
+                  <h3 className="text-lg font-semibold mb-2">Recommended Action</h3>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm">
+                      {stripMarkdown(selectedInsight.recommended_action || selectedInsight.action_plan || "Use data-driven approaches to address this opportunity.")}
+                    </p>
                   </div>
                 </div>
                 
-                {/* Expected Outcome section */}
+                {/* Business Impact section */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-2">Expected Outcome</h3>
+                  <h3 className="text-lg font-semibold mb-2">Business Impact</h3>
                   <p className="text-muted-foreground">
-                    {selectedInsight.category === "Regional Strategy" 
-                      ? "Implementing this recommendation will reduce geographic concentration risk, create more balanced revenue streams across regions, and build resilience against localized market fluctuations. Expect more sustainable growth and reduced vulnerability to regional economic changes."
-                      : selectedInsight.category === "Revenue Growth" && (selectedInsight.type === "destructive" || selectedInsight.type === "warning")
-                      ? "These interventions aim to halt the revenue decline within 60 days and restore positive growth within 90-120 days. Long-term benefits include more stable revenue patterns and improved business resilience."
-                      : selectedInsight.category === "Revenue Growth"
-                      ? "These actions will help capitalize on current momentum, accelerating growth by an estimated 15-20% above baseline projections while building sustainable processes for long-term expansion."
-                      : selectedInsight.category === "Product Management"
-                      ? "Rebalancing your product mix should improve overall portfolio profitability by 3-5 percentage points while reducing reliance on underperforming products. Expect more consistent margin performance across product lines."
-                      : selectedInsight.category === "Planning"
-                      ? "These seasonal strategies should reduce revenue variability by 15-20%, improve off-season utilization, and enhance operational efficiency during peak periods, resulting in more consistent cash flow and resource utilization."
-                      : "Successful implementation will address the identified opportunities and help optimize business performance in this area. Expected benefits include improved efficiency, enhanced competitive position, and stronger financial outcomes."
-                    }
+                    {stripMarkdown(selectedInsight.business_impact || selectedInsight.why_it_matters || getExpectedOutcome(selectedInsight))}
                   </p>
                 </div>
+                
+                {/* Model Integration section */}
+                {selectedInsight.model_integration && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Next Steps</h3>
+                    <p className="text-muted-foreground text-sm">
+                      {stripMarkdown(selectedInsight.model_integration)}
+                    </p>
+                  </div>
+                )}
               </div>
               
               <DialogFooter className="flex justify-between items-center">
                 <div className="text-xs text-muted-foreground">
-                  Priority score: {selectedInsight.priority}/5 • Generated based on your business data
+                  Priority score: {selectedInsight.priority_score ? Math.round(selectedInsight.priority_score) : selectedInsight.priority || 'N/A'} • Generated based on your business data
                 </div>
                 <Button onClick={() => setShowDetailDialog(false)}>Close</Button>
               </DialogFooter>

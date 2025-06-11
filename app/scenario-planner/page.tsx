@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { BarChart, CartesianGrid, XAxis, YAxis, Legend, Bar, ResponsiveContainer } from "recharts"
-import { ArrowRight, RotateCcw, Check, AlertCircle } from "lucide-react"
+import { ArrowRight, RotateCcw, Check, AlertCircle, Loader2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { simulateScenarios, mapToApiOrderFormat, getProducts, getLocations, getProductData } from "@/lib/api"
@@ -42,6 +42,10 @@ export default function ScenarioPlannerPage() {
   const [locations, setLocations] = useState<{id: string, name: string}[]>([])
   const [isLoadingOptions, setIsLoadingOptions] = useState(true)
   const [averageStats, setAverageStats] = useState({ price: 0, cost: 0 });
+
+  // State for simulation
+  const [simulationInProgress, setSimulationInProgress] = useState(false);
+  const [simulationErrorMessage, setSimulationErrorMessage] = useState<string | null>(null);
 
   // Load product data from the data file
   const loadProductData = async () => {
@@ -251,9 +255,19 @@ export default function ScenarioPlannerPage() {
 
   // Simulate revenue prediction
   const simulateRevenue = async () => {
-    setIsLoading(true)
-    setError("")
-    
+    if (simulationInProgress) {
+      toast({
+        title: "Simulation in progress",
+        description: "Please wait for the current simulation to complete",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSimulationInProgress(true);
+    setSimulationErrorMessage(null);
+    console.log("Starting simulation...");
+
     try {
       // Validate required fields first
       if (!simulatedScenario.locationId) {
@@ -287,13 +301,61 @@ export default function ScenarioPlannerPage() {
         // Clear the timeout
         clearTimeout(timeoutId);
         
-        console.log('API Response:', apiResponse);
+        console.log('API Response (full):', JSON.stringify(apiResponse, null, 2));
         
-        const resultsArray = Array.isArray(apiResponse?.results) ? apiResponse.results : 
-                            (apiResponse?.simulations ? apiResponse.simulations : []);
+        // Extract the variations consistently based on the response structure
+        let resultsToSet = [];
         
-        setScenarioResults(resultsArray);
+        if (apiResponse?.variations && Array.isArray(apiResponse.variations)) {
+          resultsToSet = apiResponse.variations;
+          console.log('Using variations array from response:', resultsToSet.length);
+        } else if (apiResponse?.results && Array.isArray(apiResponse.results)) {
+          resultsToSet = apiResponse.results;
+          console.log('Using results array from response:', resultsToSet.length);
+        } else if (Array.isArray(apiResponse)) {
+          resultsToSet = apiResponse;
+          console.log('Using direct array response:', resultsToSet.length);
+        } else {
+          console.warn('Response has no recognized array structure, creating wrapper');
+          // Wrap the response in an array if it's not already one
+          resultsToSet = [apiResponse];
+        }
+        
+        // Handle empty results
+        if (resultsToSet.length === 0) {
+          console.warn('Empty results array, using fallback data');
+          const basePrice = simulatedScenario.unitPrice;
+          const baseCost = simulatedScenario.unitCost;
+          
+          resultsToSet = [
+            {
+              name: "Current Scenario (Fallback)",
+              revenue: basePrice * 3,
+              profit: (basePrice - baseCost) * 3,
+              quantity: 3
+            },
+            {
+              name: "Higher Price (Fallback)",
+              revenue: basePrice * 1.1 * 2,
+              profit: (basePrice * 1.1 - baseCost) * 2,
+              quantity: 2
+            },
+            {
+              name: "Lower Price (Fallback)",
+              revenue: basePrice * 0.9 * 4,
+              profit: (basePrice * 0.9 - baseCost) * 4,
+              quantity: 4
+            }
+          ];
+        }
+        
+        console.log('Setting scenarioResults to:', JSON.stringify(resultsToSet, null, 2));
+        
+        // Update state in sequence to ensure React processes it correctly
+        setScenarioResults(resultsToSet);
         setIsSimulated(true);
+        
+        console.log('isSimulated set to true');
         
         // Show a note if provided in the API response
         if (apiResponse?.note) {
@@ -344,7 +406,7 @@ export default function ScenarioPlannerPage() {
         const basePrice = simulatedScenario.unitPrice;
         const baseCost = simulatedScenario.unitCost;
         
-        setScenarioResults([
+        const fallbackResults = [
           {
             name: "Current Scenario (Fallback)",
             revenue: basePrice * 3,
@@ -363,12 +425,26 @@ export default function ScenarioPlannerPage() {
             profit: (basePrice * 0.9 - baseCost) * 4,
             quantity: 4
           }
-        ]);
+        ];
         
+        console.log('Setting fallback scenarioResults:', fallbackResults);
+        setScenarioResults(fallbackResults);
         setIsSimulated(true);
+        console.log('isSimulated set to true (fallback)');
       }
     } finally {
       setIsLoading(false);
+      setSimulationInProgress(false);
+      console.log('Simulation completed, checking final state:');
+      console.log('- isSimulated:', isSimulated);
+      console.log('- scenarioResults:', scenarioResults);
+      
+      // Force a re-render
+      setTimeout(() => {
+        console.log('Checking state after timeout:');
+        console.log('- isSimulated:', isSimulated);
+        console.log('- scenarioResults:', scenarioResults);
+      }, 500);
     }
   }
 
@@ -442,9 +518,16 @@ export default function ScenarioPlannerPage() {
 
   // Prepare chart data from scenario results
   const getChartData = () => {
+    console.log("getChartData called with:", {
+      isSimulated,
+      scenarioResultsLength: Array.isArray(scenarioResults) ? scenarioResults.length : 'not an array',
+      scenarioResults: JSON.stringify(scenarioResults, null, 2)
+    });
+
     // Defensive: ensure scenarioResults is always an array
     const safeResults = Array.isArray(scenarioResults) ? scenarioResults : [];
     if (!isSimulated || safeResults.length === 0) {
+      console.log("Returning placeholder data - not simulated or no results");
       // Return placeholder data if not simulated yet
       return [
         {
@@ -457,24 +540,72 @@ export default function ScenarioPlannerPage() {
       ]
     }
     
+    console.log("Processing chart data from:", JSON.stringify(safeResults, null, 2));
+    
+    // Check if we have a variations array (from API) or direct results
+    const resultsToProcess = safeResults[0]?.variations ? safeResults[0].variations : safeResults;
+    console.log("Results to process:", JSON.stringify(resultsToProcess, null, 2));
+    
     // Map backend keys to frontend keys
-    const chartData = safeResults.map(result => ({
-      name: result.Scenario || result.scenario,
-      revenue: result["Predicted Revenue"] ?? result.predicted_revenue ?? 0,
-      profit: result.Profit ?? result.profit ?? 0,
-      quantity: result["Predicted Quantity"] ?? result.predicted_quantity ?? 0,
-      raw_quantity: result["raw_quantity"] ?? result["Predicted Quantity"] ?? result.predicted_quantity ?? 0
-    }));
+    const chartData = resultsToProcess.map(result => {
+      // Extract scenario name
+      let name = result.name || result.scenario || result.Scenario;
+      if (!name && result.price_factor) {
+        // If we have a price factor, create a name based on it
+        const factor = result.price_factor;
+        if (factor < 1) {
+          name = `${Math.round((1-factor)*100)}% Lower`;
+        } else if (factor > 1) {
+          name = `${Math.round((factor-1)*100)}% Higher`;
+        } else {
+          name = "Current Price";
+        }
+      }
+      
+      // Extract revenue (check all possible field names)
+      const revenue = 
+        result.revenue || 
+        result.predicted_revenue || 
+        result["Predicted Revenue"] || 
+        result.Revenue || 0;
+      
+      // Extract profit
+      const profit = 
+        result.profit || 
+        result.Profit || 0;
+      
+      // Extract quantity
+      const quantity = 
+        result.quantity || 
+        result.predicted_quantity || 
+        result["Predicted Quantity"] || 
+        result.Quantity || 0;
+      
+      return {
+        name: name || "Scenario",
+        revenue: revenue,
+        profit: profit,
+        quantity: quantity,
+        raw_quantity: quantity,
+        // Keep original price for tooltip
+        unit_price: result.unit_price || result["Unit Price"] || 0
+      };
+    });
+    
+    console.log("Mapped chart data:", JSON.stringify(chartData, null, 2));
     
     // Check if we need to scale the quantity for better visualization
     // This is needed when the quantity is much lower than revenue/profit
     const maxQuantity = Math.max(...chartData.map(item => item.quantity));
     const maxRevenue = Math.max(...chartData.map(item => item.revenue));
     
+    console.log("Quantity/Revenue scaling:", {maxQuantity, maxRevenue});
+    
     // If quantity is less than 5% of revenue, scale it for better visibility
     if (maxQuantity > 0 && maxRevenue > 0 && maxQuantity < maxRevenue * 0.05) {
       // Scale factor to make quantity approximately 1/3 of max revenue
       const scaleFactor = (maxRevenue / 3) / maxQuantity;
+      console.log("Applying scale factor for quantity:", scaleFactor);
       
       // Apply scaling for display purposes only
       return chartData.map(item => ({
@@ -486,6 +617,7 @@ export default function ScenarioPlannerPage() {
       }));
     }
     
+    console.log("Final chart data:", JSON.stringify(chartData, null, 2));
     return chartData;
   }
 
@@ -620,13 +752,22 @@ export default function ScenarioPlannerPage() {
               <RotateCcw className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />
               Reset
             </Button>
-            <Button onClick={simulateRevenue} disabled={isLoading} className="text-xs sm:text-sm h-8 sm:h-10">
-              {isLoading ? (
-                "Processing..."
+            <Button
+              variant="default"
+              size="lg"
+              onClick={simulateRevenue}
+              disabled={simulationInProgress || !simulatedScenario.locationId || !simulatedScenario.productId || !simulatedScenario.unitPrice}
+              className="w-full"
+            >
+              {simulationInProgress ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Simulating...
+                </>
               ) : (
                 <>
+                  <ArrowRight className="mr-2 h-4 w-4" />
                   Simulate Revenue
-                  <ArrowRight className="ml-1 sm:ml-2 h-3 sm:h-4 w-3 sm:w-4" />
                 </>
               )}
             </Button>
@@ -642,81 +783,88 @@ export default function ScenarioPlannerPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="h-60 sm:h-72 md:h-80">
+            {console.log("Rendering chart with data:", getChartData().length, "items")}
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={{ theme: { grid: { stroke: "#ddd" } } }}>
-                <BarChart 
-                  data={getChartData()} 
-                  className="mt-2 sm:mt-4 md:mt-6"
-                  margin={{
-                    top: 5,
-                    right: 10,
-                    left: 0,
-                    bottom: 5,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{fontSize: '0.7rem'}}
-                    height={40}
-                  />
-                  <YAxis 
-                    tick={{fontSize: '0.7rem'}}
-                    width={40}
-                    tickFormatter={(value) => `$${value > 999 ? `${(value/1000).toFixed(1)}k` : value}`}
-                  />
-                  <ChartTooltip
-                    formatter={(value, name) => {
-                      // Format values with 2 decimal places for currency values
-                      if (name === 'Revenue' || name === 'Profit') {
-                        return [`$${value.toFixed(2)}`, name];
-                      }
-                      
-                      // For quantity, find the original datapoint to get raw_quantity if available
-                      if (name === 'Quantity') {
-                        // Get the current chart data
-                        const currentData = getChartData();
-                        // Find the item with this value or close to it (floating point comparison)
-                        const currentItem = currentData.find(item => Math.abs(item.quantity - value) < 0.001);
-                        
-                        // Use raw_quantity if available, otherwise use the value
-                        const actualQuantity = currentItem?.raw_quantity !== undefined ? 
-                                              currentItem.raw_quantity : 
-                                              value;
-                        
-                        // Format as integer with comma separation for thousands
-                        return [Math.round(actualQuantity).toLocaleString(), name];
-                      }
-                      
-                      // Default case
-                      return [value.toLocaleString(), name];
+                {getChartData().length > 0 ? (
+                  <BarChart 
+                    data={getChartData()} 
+                    className="mt-2 sm:mt-4 md:mt-6"
+                    margin={{
+                      top: 5,
+                      right: 10,
+                      left: 0,
+                      bottom: 5,
                     }}
-                    labelFormatter={(label) => `Scenario: ${label}`}
-                  />
-                  <Legend 
-                    wrapperStyle={{fontSize: '0.7rem'}}
-                    iconSize={8}
-                    iconType="circle"
-                  />
-                  <Bar 
-                    dataKey="revenue" 
-                    fill="#3b82f6" 
-                    name="Revenue" 
-                    isAnimationActive={true}
-                  />
-                  <Bar 
-                    dataKey="profit" 
-                    fill="#22c55e" 
-                    name="Profit" 
-                    isAnimationActive={true}
-                  />
-                  <Bar 
-                    dataKey="quantity" 
-                    fill="#eab308" 
-                    name="Quantity" 
-                    isAnimationActive={true}
-                  />
-                </BarChart>
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="name" 
+                      tick={{fontSize: '0.7rem'}}
+                      height={40}
+                    />
+                    <YAxis 
+                      tick={{fontSize: '0.7rem'}}
+                      width={40}
+                      tickFormatter={(value) => `$${value > 999 ? `${(value/1000).toFixed(1)}k` : value}`}
+                    />
+                    <ChartTooltip
+                      formatter={(value, name) => {
+                        // Format values with 2 decimal places for currency values
+                        if (name === 'Revenue' || name === 'Profit') {
+                          return [`$${value.toFixed(2)}`, name];
+                        }
+                        
+                        // For quantity, find the original datapoint to get raw_quantity if available
+                        if (name === 'Quantity') {
+                          // Get the current chart data
+                          const currentData = getChartData();
+                          // Find the item with this value or close to it (floating point comparison)
+                          const currentItem = currentData.find(item => Math.abs(item.quantity - value) < 0.001);
+                          
+                          // Use raw_quantity if available, otherwise use the value
+                          const actualQuantity = currentItem?.raw_quantity !== undefined ? 
+                                                 currentItem.raw_quantity : 
+                                                 value;
+                          
+                          // Format as integer with comma separation for thousands
+                          return [Math.round(actualQuantity).toLocaleString(), name];
+                        }
+                        
+                        // Default case
+                        return [value.toLocaleString(), name];
+                      }}
+                      labelFormatter={(label) => `Scenario: ${label}`}
+                    />
+                    <Legend 
+                      wrapperStyle={{fontSize: '0.7rem'}}
+                      iconSize={8}
+                      iconType="circle"
+                    />
+                    <Bar 
+                      dataKey="revenue" 
+                      fill="#3b82f6" 
+                      name="Revenue" 
+                      isAnimationActive={true}
+                    />
+                    <Bar 
+                      dataKey="profit" 
+                      fill="#22c55e" 
+                      name="Profit" 
+                      isAnimationActive={true}
+                    />
+                    <Bar 
+                      dataKey="quantity" 
+                      fill="#eab308" 
+                      name="Quantity" 
+                      isAnimationActive={true}
+                    />
+                  </BarChart>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-muted-foreground">No data to display. Run a simulation first.</p>
+                  </div>
+                )}
               </ChartContainer>
             </ResponsiveContainer>
           </CardContent>

@@ -2,8 +2,8 @@
 echo Starting IDSS (Intelligent Decision Support System)
 echo ===================================================
 
-REM Start the Flask API backend
-start cmd /k "echo Starting Flask API backend with 50/50 Split Model... && python combined_revenue_api_50_50.py"
+REM Start the Flask API backend with Ethical Time-Enhanced Model
+start cmd /k "echo Starting Flask API backend with Ethical Time-Enhanced Model... && python combined_time_enhanced_ethical_api.py"
 
 REM Allow time for the API to start
 timeout /t 3 /nobreak

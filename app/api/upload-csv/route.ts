@@ -5,7 +5,7 @@ import { Readable } from 'stream';
 
 // Function to ensure the data directory exists
 function ensureDataDirExists() {
-  const dataDir = path.join(process.cwd(), 'data');
+  const dataDir = path.join(process.cwd(), 'public', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
@@ -61,24 +61,17 @@ export async function POST(request: NextRequest) {
     // Get the file data as a Buffer
     const fileBuffer = Buffer.from(await file.arrayBuffer());
     
-    // Create a safe filename (avoid overwriting the default file)
+    // Create a safe filename (avoid overwriting existing files)
     let filename = file.name;
-    if (filename === 'Adjusted_Sales_Data_With_Time_Features.csv') {
-      // Add a timestamp to avoid overwriting the default file
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      filename = `Adjusted_Sales_Data_With_Time_Features_${timestamp}.csv`;
-    }
+    // Always add a timestamp to prevent overwriting any existing files
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
+    const extension = filename.substring(filename.lastIndexOf('.')) || '';
+    filename = `${nameWithoutExt}_${timestamp}${extension}`;
     
-    // Save the file to the data directory
+    // Save the file to the data directory only
     const filePath = path.join(dataDir, filename);
     fs.writeFileSync(filePath, fileBuffer);
-    
-    // Copy to public/data as well for frontend access
-    const publicDataDir = path.join(process.cwd(), 'public', 'data');
-    if (!fs.existsSync(publicDataDir)) {
-      fs.mkdirSync(publicDataDir, { recursive: true });
-    }
-    fs.writeFileSync(path.join(publicDataDir, filename), fileBuffer);
     
     return NextResponse.json({
       success: true,

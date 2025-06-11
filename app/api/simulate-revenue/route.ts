@@ -1,181 +1,269 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Define the API endpoint URL
+const FLASK_API_URL = process.env.FLASK_API_URL || 'http://localhost:5000';
+
 export async function POST(request: NextRequest) {
   try {
     // Get request body
-    const data = await request.json();
+    const requestData = await request.json();
     
-    // Add timestamp to prevent caching
-    const timestamp = new Date().getTime();
-    const requestData = { ...data, _timestamp: timestamp };
-    
-    // Log incoming request for debugging
-    console.log('Simulate revenue request:', requestData);
-    
-    // Define Flask API URL from environment variables
-    const apiUrl = process.env.FLASK_API_URL || 'http://localhost:5000';
-    
-    // Handle missing or null values
-    const processedData = { ...requestData };
-    
-    // Check if this is an "All Locations" request and mark it specially
-    const isAllLocations = processedData.locationId === 'All';
-    
-    // Convert locationId to Location format expected by backend
-    if (processedData.locationId) {
-      processedData.Location = processedData.locationId;
-      delete processedData.locationId;
+    // Log the original request for debugging
+    console.log("Received simulate-revenue request:", requestData);
+
+    // For "All" location, don't substitute a default - properly handle as aggregate
+    if (requestData.Location === 'All' || requestData.location === 'All') {
+      console.log("Processing aggregate request for all locations");
+      // No substitution needed, leave as 'All' for the backend to handle properly
     }
-    
-    // Convert productId to _ProductID format expected by backend
-    if (processedData.productId) {
-      processedData._ProductID = processedData.productId ? parseInt(String(processedData.productId), 10) : 1;
-      delete processedData.productId;
+
+    // Transform fields to match Flask API expectations
+    const transformedData = {
+      _ProductID: requestData.product_id || requestData._ProductID,
+      Location: requestData.location || requestData.Location,
+      'Unit Price': requestData.unit_price || requestData['Unit Price'],
+      'Unit Cost': requestData.unit_cost || requestData['Unit Cost'] || 0,
+      Weekday: requestData.weekday || requestData.Weekday,
+      Month: requestData.month || requestData.Month,
+      Day: requestData.day || requestData.Day,
+      Year: requestData.year || requestData.Year,
+      _timestamp: requestData._timestamp || Date.now()
+    };
+
+    console.log("Sending to Flask API:", transformedData);
+
+    // Add validation for extreme price values
+    if (transformedData['Unit Price'] > 100000) {
+      console.warn(`Extreme price value detected: ${transformedData['Unit Price']}. Capping at 100,000.`);
+      transformedData['Unit Price'] = 100000;
     }
-    
-    // Ensure Unit Price is correctly formatted
-    if (processedData.unitPrice !== undefined) {
-      processedData['Unit Price'] = processedData.unitPrice;
-      delete processedData.unitPrice;
-    }
-    
-    // Ensure Unit Cost is correctly formatted
-    if (processedData.unitCost !== undefined) {
-      processedData['Unit Cost'] = processedData.unitCost;
-      delete processedData.unitCost;
-    }
-    
-    // Handle null/undefined values for required fields
-    if (processedData._ProductID === null || processedData._ProductID === undefined) {
-      processedData._ProductID = 1; // Default product ID
-    }
-    
-    if (processedData['Unit Price'] === null || processedData['Unit Price'] === undefined) {
-      processedData['Unit Price'] = 100.0; // Default price
-    }
-    
-    if (processedData['Unit Cost'] === null || processedData['Unit Cost'] === undefined) {
-      processedData['Unit Cost'] = 50.0; // Default cost
-    }
-    
-    // Ensure numeric fields are properly typed
-    processedData._ProductID = parseInt(String(processedData._ProductID), 10);
-    processedData['Unit Price'] = parseFloat(String(processedData['Unit Price']));
-    processedData['Unit Cost'] = parseFloat(String(processedData['Unit Cost']));
-    
-    // Add current date if missing
-    const today = new Date();
-    if (!processedData.Month) {
-      processedData.Month = today.getMonth() + 1; // Months are 0-indexed in JS
-    }
-    if (!processedData.Day) {
-      processedData.Day = today.getDate();
-    }
-    if (!processedData.Year) {
-      processedData.Year = today.getFullYear();
-    }
-    
-    // Handle Weekday formatting
-    if (!processedData.Weekday && processedData.Day) {
-      // Generate weekday from date if possible
-      const date = new Date(processedData.Year, processedData.Month - 1, processedData.Day);
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      processedData.Weekday = days[date.getDay()];
-    } else if (!processedData.Weekday) {
-      // Default to current day of week if not provided
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      processedData.Weekday = days[today.getDay()];
-    }
-    
-    // Check for extreme price values that might cause backend errors
-    if (processedData['Unit Price'] > 100000) {
-      return NextResponse.json({
-        status: 'error',
-        error: 'Unit Price exceeds maximum allowed value (100000)'
-      }, { status: 400 });
-    }
-    
-    // Log the transformed data being sent to Flask
-    console.log('Sending to Flask API:', processedData);
     
     // Call Flask API
-    const flaskResponse = await fetch(`${apiUrl}/simulate-revenue`, {
+    const response = await fetch(`${FLASK_API_URL}/simulate-revenue`, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      },
-      body: JSON.stringify(processedData),
-      // Set a reasonable timeout
-      signal: AbortSignal.timeout(15000)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(transformedData),
+      // Set a longer timeout for annual simulations (365 days takes time)
+      signal: AbortSignal.timeout(60000)
     });
     
-    // Check for errors
-    if (!flaskResponse.ok) {
-      const errorText = await flaskResponse.text();
-      console.error('Flask API error:', errorText);
-      throw new Error(`Flask API returned ${flaskResponse.status}: ${errorText}`);
+    // Check if response is ok
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Flask API returned ${response.status}: ${errorText}`);
+      
+      // Generate fallback data
+      return NextResponse.json(generateFallbackResponse(transformedData));
     }
     
     // Parse response
-    const responseData = await flaskResponse.json();
+    const responseData = await response.json();
+    console.log("Flask API raw response:", JSON.stringify(responseData, null, 2));
     
-    // Log response for debugging
-    console.log('Flask API response status:', responseData.status);
-    console.log('Results count:', 
-      responseData.results?.length || responseData.simulations?.length || 0);
-    
-    // Handle both possible field names for compatibility
-    const resultData = responseData.results || responseData.simulations || [];
-    
-    // Normalize the response to ensure consistent field names
-    // This ensures the frontend always gets predictable field names regardless of backend changes
-    const normalizedResults = resultData.map((item: any) => ({
-      Scenario: item.Scenario || item.scenario || 'Unknown',
-      'Unit Price': item['Unit Price'] || item.unitPrice || 0,
-      'Predicted Revenue': item['Predicted Revenue'] || item.revenue || item.predicted_revenue || 0,
-      'Predicted Quantity': item['Predicted Quantity'] || item.quantity || item.predicted_quantity || 0,
-      'Profit': item.Profit || item.profit || 0,
-      // Include these fields for compatibility with different consumers
-      revenue: item['Predicted Revenue'] || item.revenue || item.predicted_revenue || 0,
-      quantity: item['Predicted Quantity'] || item.quantity || item.predicted_quantity || 0,
-      profit: item.Profit || item.profit || 0,
-      // Include location-specific metadata if available
-      locations_averaged: item.locations_averaged,
-    }));
-    
-    // Create a consistent response structure
-    const responsePayload = {
-      status: responseData.status || 'success',
-      results: normalizedResults,
-      simulations: normalizedResults, // Include both field names for compatibility
-      note: responseData.note, // Preserve any notes from backend
-      isAllLocations: isAllLocations, // Add this flag to the response
-    };
-    
-    // If this was an "All Locations" request and there's no note from the backend, add a default note
-    if (isAllLocations && !responsePayload.note) {
-      responsePayload.note = "Using combined data from all locations. Results represent the sum across all regions.";
+    // Add a note if "All Locations" was selected
+    if (transformedData.Location === 'All') {
+      responseData.note = "Using data aggregated across all locations";
     }
     
-    // Return normalized response with cache control headers
-    return NextResponse.json(responsePayload, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    });
+    // Transform the response to ensure consistent structure
+    const standardizedResponse = standardizeResponse(responseData, transformedData);
+    console.log("Standardized response:", JSON.stringify(standardizedResponse, null, 2));
     
+    // Return response
+    return NextResponse.json(standardizedResponse);
   } catch (error: any) {
-    console.error('Error in simulate-revenue route:', error);
+    console.error('Error in simulate-revenue API route:', error);
     
-    // Return a structured error response
-    return NextResponse.json({
-      status: 'error',
-      error: error.message || 'An unexpected error occurred',
-      details: error.toString()
-    }, { status: 500 });
+    try {
+      // Get a copy of the request data if possible
+      const fallbackData = {
+        _ProductID: 1,
+        Location: 'All',
+        'Unit Price': 100,
+        'Unit Cost': 50
+      };
+      
+      return NextResponse.json(generateFallbackResponse(fallbackData));
+    } catch (fallbackError) {
+      console.error('Error generating fallback response:', fallbackError);
+      return NextResponse.json(
+        { 
+          status: "error", 
+          error: error.message || 'An unexpected error occurred',
+          message: 'Failed to simulate revenue'
+        },
+        { status: 500 }
+      );
+    }
   }
+}
+
+// Helper function to create scenario names based on price factors
+function createScenarioName(variation: any) {
+  // If we already have a name, use it
+  if (variation.name || variation.scenario || variation.Scenario) {
+    return variation.name || variation.scenario || variation.Scenario;
+  }
+  
+  // If we have a price factor, create a name based on it
+  if (variation.price_factor) {
+    const factor = variation.price_factor;
+    if (factor < 0.95) {
+      return `${Math.round((1-factor)*100)}% Lower`;
+    } else if (factor > 1.05) {
+      return `${Math.round((factor-1)*100)}% Higher`;
+    } else {
+      return "Current Price";
+    }
+  }
+  
+  // Default name
+  return "Scenario";
+}
+
+// Function to standardize the response format for better frontend compatibility
+function standardizeResponse(responseData: any, requestData: any) {
+  console.log("Standardizing response from:", typeof responseData, responseData ? "with data" : "empty");
+  
+  // Special case for empty or null response
+  if (!responseData) {
+    console.warn("Empty response from Flask API, using fallback");
+    return generateFallbackResponse(requestData);
+  }
+  
+  // Check if the response already has a variations array
+  if (Array.isArray(responseData.variations) || Array.isArray(responseData.results) || Array.isArray(responseData.simulations)) {
+    // Use existing variations array
+    const variations = responseData.variations || responseData.results || responseData.simulations;
+    console.log("Found variations array with", variations.length, "items");
+    
+    // Ensure each variation has consistent field names
+    const standardizedVariations = variations.map((variation: any) => ({
+      price_factor: variation.price_factor || 1.0,
+      unit_price: variation.unit_price || variation['Unit Price'] || requestData['Unit Price'],
+      quantity: variation.quantity || variation.predicted_quantity || variation['Predicted Quantity'] || 0,
+      predicted_quantity: variation.predicted_quantity || variation.quantity || variation['Predicted Quantity'] || 0,
+      revenue: variation.revenue || variation.predicted_revenue || variation['Predicted Revenue'] || 0,
+      predicted_revenue: variation.predicted_revenue || variation.revenue || variation['Predicted Revenue'] || 0,
+      profit: variation.profit || variation.Profit || 0,
+      unit_cost: variation.unit_cost || variation['Unit Cost'] || requestData['Unit Cost'] || 0,
+      name: createScenarioName(variation),
+    }));
+    
+    return {
+      status: "success",
+      product_id: responseData.product_id || responseData._ProductID || requestData._ProductID,
+      location: responseData.location || responseData.Location || requestData.Location,
+      unit_price: responseData.unit_price || responseData['Unit Price'] || requestData['Unit Price'],
+      unit_cost: responseData.unit_cost || responseData['Unit Cost'] || requestData['Unit Cost'],
+      variations: standardizedVariations,
+      note: responseData.note
+    };
+  } else if (Array.isArray(responseData)) {
+    // Response is already an array of variations
+    console.log("Response is an array with", responseData.length, "items");
+    const standardizedVariations = responseData.map((variation: any) => ({
+      price_factor: variation.price_factor || 1.0,
+      unit_price: variation.unit_price || variation['Unit Price'] || requestData['Unit Price'],
+      quantity: variation.quantity || variation.predicted_quantity || variation['Predicted Quantity'] || 0,
+      predicted_quantity: variation.predicted_quantity || variation.quantity || variation['Predicted Quantity'] || 0,
+      revenue: variation.revenue || variation.predicted_revenue || variation['Predicted Revenue'] || 0,
+      predicted_revenue: variation.predicted_revenue || variation.revenue || variation['Predicted Revenue'] || 0,
+      profit: variation.profit || variation.Profit || 0,
+      unit_cost: variation.unit_cost || variation['Unit Cost'] || requestData['Unit Cost'] || 0,
+      name: createScenarioName(variation),
+    }));
+    
+    return {
+      status: "success",
+      product_id: requestData._ProductID,
+      location: requestData.Location,
+      unit_price: requestData['Unit Price'],
+      unit_cost: requestData['Unit Cost'],
+      variations: standardizedVariations,
+      note: "Using aggregated results"
+    };
+  } else if (typeof responseData === 'object') {
+    // Response is a single object, wrap it in an array
+    console.log("Response is a single object, creating variations array");
+    // Convert to a single variation
+    const standardizedVariation = {
+      price_factor: 1.0,
+      unit_price: responseData.unit_price || responseData['Unit Price'] || requestData['Unit Price'],
+      quantity: responseData.quantity || responseData.predicted_quantity || responseData['Predicted Quantity'] || 0,
+      predicted_quantity: responseData.predicted_quantity || responseData.quantity || responseData['Predicted Quantity'] || 0,
+      revenue: responseData.revenue || responseData.predicted_revenue || responseData['Predicted Revenue'] || 0,
+      predicted_revenue: responseData.predicted_revenue || responseData.revenue || responseData['Predicted Revenue'] || 0,
+      profit: responseData.profit || responseData.Profit || 0,
+      unit_cost: responseData.unit_cost || responseData['Unit Cost'] || requestData['Unit Cost'] || 0,
+      name: 'Current Price',
+    };
+    
+    return {
+      status: "success",
+      product_id: responseData.product_id || responseData._ProductID || requestData._ProductID,
+      location: responseData.location || responseData.Location || requestData.Location,
+      unit_price: responseData.unit_price || responseData['Unit Price'] || requestData['Unit Price'],
+      unit_cost: responseData.unit_cost || responseData['Unit Cost'] || requestData['Unit Cost'],
+      variations: [standardizedVariation],
+      note: "Single result converted to variations array"
+    };
+  }
+  
+  // If we can't standardize, generate fallback
+  console.warn("Couldn't standardize response, using fallback");
+  return generateFallbackResponse(requestData);
+}
+
+// Function to generate fallback simulation data when API fails
+function generateFallbackResponse(data: any) {
+  const unitPrice = parseFloat(data['Unit Price']) || 100;
+  const unitCost = parseFloat(data['Unit Cost']) || 50;
+  const productId = data._ProductID || 1;
+  const location = data.Location || 'All';
+  
+  // Price elasticity function - quantity decreases as price increases
+  const calculateQuantity = (price: number) => {
+    // Base quantity is 100 at price $50
+    const baseQuantity = 100;
+    // Exponential decay with elasticity factor
+    const elasticityFactor = 0.01;
+    // Calculate quantity based on price (higher price = lower quantity)
+    return Math.max(0, Math.round(baseQuantity * Math.exp(-elasticityFactor * (price - 50))));
+  };
+  
+  // Calculate variations
+  const variations = [];
+  const priceFactor = 0.2; // 20% price variation
+  
+  // Generate 7 price points from -60% to +60%
+  for (let i = -3; i <= 3; i++) {
+    const factor = 1 + (i * priceFactor);
+    const price = Math.round(unitPrice * factor * 100) / 100;
+    const quantity = calculateQuantity(price);
+    const revenue = price * quantity;
+    const cost = unitCost * quantity;
+    const profit = revenue - cost;
+    
+    variations.push({
+      price_factor: factor,
+      unit_price: price,
+      predicted_quantity: quantity,
+      quantity: quantity,
+      predicted_revenue: revenue,
+      revenue: revenue,
+      cost: cost,
+      profit: profit
+    });
+  }
+  
+  return {
+    status: "success",
+    product_id: productId,
+    location: location,
+    unit_price: unitPrice,
+    unit_cost: unitCost,
+    variations: variations,
+    note: "Using fallback simulation data (API unavailable)"
+  };
 } 

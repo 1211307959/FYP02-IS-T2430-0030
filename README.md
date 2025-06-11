@@ -1,18 +1,21 @@
-# Intelligent Decision Support System (IDSS) for Small Businesses
+# Revenue Prediction System - IDSS for Small Businesses
 
 ## Project Overview
-A web-based decision support system that leverages machine learning to provide small businesses with predictive analytics and data-driven insights. The system analyzes historical sales data to forecast future performance, simulate business scenarios, and generate actionable recommendations.
+A production-ready web-based decision support system that leverages ethical machine learning to provide small businesses with accurate revenue predictions and data-driven insights. The system uses an advanced ethical time-enhanced LightGBM model to analyze historical sales data and generate actionable business recommendations.
+
+**Current Production Model**: Ethical Time-Enhanced LightGBM Model (R² = 0.9937)
 
 **Key Features**:
-- Revenue prediction with 99.47% accuracy (R² = 0.9947)
-- Interactive scenario planning with price optimization
-- Dynamic business insights with implementation recommendations
-- Responsive dashboard with interactive visualizations
-- Multi-file data integration with automatic processing
-- Price elasticity modeling for revenue optimization
-- Seasonal and location-based performance analysis
+- **Accurate Revenue Prediction**: 99.37% accuracy using ethical AI without target leakage
+- **Interactive Scenario Planning**: Sophisticated price optimization and what-if analysis
+- **Sales Forecasting**: Advanced time-series forecasting with confidence intervals
+- **Business Insights**: Dynamic recommendations with implementation plans
+- **Responsive Dashboard**: Real-time visualizations and KPI monitoring
+- **Price Elasticity Modeling**: Economic-based quantity and revenue predictions
+- **Temporal Analytics**: Seasonal, holiday, and weekday pattern analysis
+- **Location Intelligence**: Multi-location aggregation and comparison
 
-**Target Users**: Small business owners, retail managers, e-commerce operators
+**Target Users**: Small business owners, retail managers, e-commerce operators, data analysts
 
 ## System Architecture
 ```mermaid
@@ -179,34 +182,102 @@ sequenceDiagram
 - LightGBM/XGBoost for ML models
 
 **ML Pipeline**:
-- 50/50 Split XGBoost model (R² = 0.9947)
-- Advanced feature engineering with price ratios
-- Cyclical time encoding for seasonality
-- Location-based modeling
+- Ethical Time-Enhanced LightGBM model (R² = 0.9937)
+- Advanced temporal feature engineering with cyclical encodings
+- No target leakage - uses only available features at prediction time
+- Sophisticated price elasticity modeling
+- Holiday and seasonal pattern detection
+- Location and product interaction features
 - Hyperparameter optimization via RandomizedSearchCV
 
-## Installation
-1. Clone repository:
+## Quick Start
+
+### Prerequisites
+- **Python 3.9+** with pip
+- **Node.js 18+** with npm
+- **Git** for version control
+
+### Installation
+1. **Clone repository:**
 ```bash
 git clone https://github.com/yourusername/idssnew.git
 cd idssnew
 ```
 
-2. Install dependencies:
+2. **Install dependencies:**
 ```bash
-# Frontend
-npm install
-
-# Backend
+# Backend (Python)
 pip install -r requirements.txt
+
+# Frontend (Node.js)
+npm install
 ```
 
-3. Download pre-trained models and place in project root directory
-
-4. Start system:
+3. **Start the application:**
 ```bash
-start-idss.bat
+# Start backend API (Terminal 1)
+python combined_time_enhanced_ethical_api.py
+
+# Start frontend (Terminal 2)
+npm run dev
 ```
+
+4. **Access the application:**
+- **Frontend**: http://localhost:3000
+- **API**: http://localhost:5000
+- **Health Check**: http://localhost:5000/health
+
+## Production Files
+
+### Core System
+- `revenue_predictor_time_enhanced_ethical.py` - Main prediction engine
+- `combined_time_enhanced_ethical_api.py` - Flask API server  
+- `train_time_enhanced_ethical_model.py` - Model training script
+- `sales_forecast_enhanced.py` - Sales forecasting module
+
+### Model Files (Required for Production)
+- `revenue_model_time_enhanced_ethical.pkl` - Trained LightGBM model
+- `revenue_encoders_time_enhanced_ethical.pkl` - Feature encoders
+- `reference_data_time_enhanced_ethical.pkl` - Reference statistics
+- `trainingdataset.csv` - Training dataset
+
+### Testing
+- `app_model_test.py` - Main model validation and testing
+- `test_ethical_time_enhanced_model.py` - Comprehensive model tests
+
+## Documentation
+📚 **All documentation is located in the `/docs` folder** for easy navigation:
+
+- `docs/model-guide.md` - Model architecture and performance details
+- `docs/api-guide.md` - API endpoints and usage examples  
+- `docs/testing-guide.md` - Testing procedures and validation
+- `docs/deployment-guide.md` - Production deployment instructions
+- `docs/sales-forecast-guide.md` - Sales forecasting documentation
+
+## Technical Stack
+
+### Machine Learning
+- **Algorithm:** LightGBM Regressor with ethical feature engineering
+- **Features:** 50+ advanced temporal and price-based features
+- **Performance:** R² = 0.9937, MAE = 48.06, RMSE = 238.37
+- **Latency:** <1ms per prediction
+
+### Backend
+- **Framework:** Flask with CORS support
+- **Model Storage:** Pickle serialization
+- **API Design:** RESTful with JSON responses
+- **Error Handling:** Comprehensive validation and logging
+
+### Frontend
+- **Framework:** Next.js 14 with React 18
+- **Styling:** Tailwind CSS with responsive design
+- **Charts:** Recharts for data visualization
+- **State Management:** React hooks and context
+
+### Data Processing
+- **Pandas:** Data manipulation and analysis
+- **NumPy:** Numerical computations
+- **Scikit-learn:** Data preprocessing and metrics
 
 ## Usage
 1. **Data Management**:

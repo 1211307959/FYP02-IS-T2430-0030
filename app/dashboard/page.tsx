@@ -533,7 +533,7 @@ export default function DashboardPage() {
           Refresh Data
         </Button>
       </div>
-
+      
       {error && (
         <Alert variant="destructive" className="mb-6">
           <AlertCircle className="h-4 w-4" />
@@ -625,13 +625,13 @@ export default function DashboardPage() {
                     {showFilters ? "Hide Filters" : "Show Filters"}
                   </Button>
                   <div className="flex items-center gap-2">
-                    <Switch 
-                      id="show-profit" 
-                      checked={showProfit}
-                      onCheckedChange={setShowProfit}
-                      className="data-[state=checked]:bg-green-500"
-                    />
-                    <Label htmlFor="show-profit">Show Profit</Label>
+                  <Switch 
+                    id="show-profit" 
+                    checked={showProfit}
+                    onCheckedChange={setShowProfit}
+                    className="data-[state=checked]:bg-green-500"
+                  />
+                  <Label htmlFor="show-profit">Show Profit</Label>
                   </div>
                 </div>
               </div>
@@ -817,28 +817,28 @@ export default function DashboardPage() {
                         if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
                         if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
                         return `$${value}`;
-                      }} 
+                      }}
                       tick={{ fontSize: 12 }}
                     />
                     <Tooltip content={<ChartTooltipContent formatter={(value) => `$${Number(value).toLocaleString()}`} />} />
                     <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="revenue" 
+                    <Line
+                      type="monotone"
+                      dataKey="revenue"
                       stroke="#3b82f6" 
-                      activeDot={{ r: 8 }} 
-                      name="Revenue" 
+                      activeDot={{ r: 8 }}
+                      name="Revenue"
                       dot={{ strokeWidth: 2, r: 4 }}
                       animationDuration={1000}
                       animationEasing="ease-in-out"
                     />
                     {showProfit && (
-                      <Line 
-                        type="monotone" 
-                        dataKey="profit" 
+                      <Line
+                        type="monotone"
+                        dataKey="profit"
                         stroke="#4ade80" 
-                        activeDot={{ r: 6 }} 
-                        name="Profit" 
+                        activeDot={{ r: 6 }}
+                        name="Profit"
                         dot={{ strokeWidth: 2, r: 3 }}
                         animationDuration={1500}
                         animationEasing="ease-in-out"
@@ -891,7 +891,7 @@ export default function DashboardPage() {
                     <Bar 
                       dataKey="revenue" 
                       fill="#8884d8" 
-                      name="Revenue" 
+                      name="Revenue"
                       animationDuration={1000}
                       animationEasing="ease-in-out"
                     >
@@ -999,7 +999,7 @@ export default function DashboardPage() {
                     <Bar 
                       dataKey="profit" 
                       fill="#4ade80" 
-                      name="Profit" 
+                      name="Profit"
                       animationDuration={1000}
                       animationEasing="ease-in-out"
                     />
@@ -1022,26 +1022,26 @@ export default function DashboardPage() {
           </DialogHeader>
           <div className="overflow-x-auto -mx-4 sm:mx-0">
             <div className="inline-block min-w-full align-middle">
-              <Table>
-                <TableHeader>
-                  <TableRow>
+          <Table>
+            <TableHeader>
+              <TableRow>
                     <TableHead className="w-12">Rank</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead className="text-right">Revenue</TableHead>
-                    <TableHead className="text-right">Profit</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allProductsData.map((product, index) => (
-                    <TableRow key={product.id || index}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>{product.name}</TableCell>
-                      <TableCell className="text-right">${product.revenue?.toLocaleString() || 0}</TableCell>
-                      <TableCell className="text-right">${product.profit?.toLocaleString() || 0}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                <TableHead>Product</TableHead>
+                <TableHead className="text-right">Revenue</TableHead>
+                <TableHead className="text-right">Profit</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {allProductsData.map((product, index) => (
+                <TableRow key={product.id || index}>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>{product.name}</TableCell>
+                  <TableCell className="text-right">${product.revenue?.toLocaleString() || 0}</TableCell>
+                  <TableCell className="text-right">${product.profit?.toLocaleString() || 0}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
             </div>
           </div>
         </DialogContent>

@@ -22,6 +22,12 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout 
   }
 };
 
+// Add this near the top of the file
+let cachedProducts: any[] | null = null;
+let cachedLocations: any[] | null = null;
+let cachedProductData: any | null = null;
+let lastCacheTime = 0;
+
 /**
  * Check if the API is healthy
  */
@@ -89,7 +95,40 @@ export async function selectDataFile(filename: string) {
  */
 export async function loadSampleCsvData() {
   try {
-    const response = await fetch('/data/Adjusted_Sales_Data_With_Time_Features.csv');
+    // First try to get the list of available CSV files
+    let csvFileName = null;
+    
+    try {
+      // Try to get available data files first
+      const dataFiles = await getDataFiles();
+      if (dataFiles && dataFiles.files && dataFiles.files.length > 0) {
+        csvFileName = dataFiles.files[0];
+      }
+    } catch (error) {
+      console.warn('Could not fetch data files list, will try with default approach');
+    }
+    
+    // If we couldn't get a file from the API, try with a direct request to the data directory
+    if (!csvFileName) {
+      try {
+        const response = await fetch('/api/data-files');
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.files && data.files.length > 0) {
+            csvFileName = data.files[0];
+          }
+        }
+      } catch (e) {
+        console.warn('Could not get file list from API, will use default fetch approach');
+      }
+    }
+    
+    // If we still don't have a filename, just try to fetch any CSV file
+    const fileUrl = csvFileName 
+      ? `/data/${csvFileName}` 
+      : '/data/sample.csv'; // Fallback to a generic name
+    
+    const response = await fetch(fileUrl);
     
     if (!response.ok) {
       throw new Error(`Failed to load sample CSV data: ${response.statusText}`);
@@ -107,14 +146,28 @@ export async function loadSampleCsvData() {
  * Fetches locations from the API
  */
 export async function getLocations() {
+  // Use cached data if available and less than 1 minute old
+  const now = Date.now();
+  if (cachedLocations && (now - lastCacheTime < 60000)) {
+    console.log("Using cached location data");
+    return cachedLocations;
+  }
+
   try {
     const response = await fetch('/api/locations');
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      throw new Error(`Failed to fetch locations: ${response.status}`);
     }
-    return await response.json();
+    
+    const data = await response.json();
+    
+    // Update cache
+    cachedLocations = data;
+    lastCacheTime = now;
+    
+    return data;
   } catch (error) {
-    console.error('Failed to fetch locations:', error);
+    console.error('Error fetching locations:', error);
     return [];
   }
 }
@@ -123,14 +176,50 @@ export async function getLocations() {
  * Fetches products from the API
  */
 export async function getProducts() {
+  // Use cached data if available and less than 1 minute old
+  const now = Date.now();
+  if (cachedProducts && (now - lastCacheTime < 60000)) {
+    console.log("Using cached product data");
+    return cachedProducts;
+  }
+
   try {
     const response = await fetch('/api/products');
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      throw new Error(`Failed to fetch products: ${response.status}`);
     }
-    return await response.json();
+    
+    const data = await response.json();
+    console.log("Raw product data:", data);
+    
+    // Transform product data to ensure consistent format
+    const transformedProducts = data.map((product: any) => {
+      // Handle different response formats
+      if (typeof product === 'object' && product !== null) {
+        // Already an object, just ensure it has the right properties
+        return {
+          id: String(product.id || product.productId || ''),
+          name: product.name || `Product ${product.id || product.productId || ''}`
+        };
+      } else {
+        // It's a primitive (likely a number), create an object
+        return {
+          id: String(product),
+          name: `Product ${product}`
+        };
+      }
+    });
+    
+    console.log("Transformed products:", transformedProducts);
+    
+    // Update cache
+    cachedProducts = transformedProducts;
+    lastCacheTime = now;
+    
+    return transformedProducts;
   } catch (error) {
-    console.error('Failed to fetch products:', error);
+    console.error("Error fetching products:", error);
+    // Return empty array on error
     return [];
   }
 }
@@ -182,14 +271,28 @@ export async function getDashboardData(cacheBustQuery?: string) {
  * Fetches product price and cost data from the API
  */
 export async function getProductData() {
+  // Use cached data if available and less than 1 minute old
+  const now = Date.now();
+  if (cachedProductData && (now - lastCacheTime < 60000)) {
+    console.log("Using cached product price/cost data");
+    return cachedProductData;
+  }
+
   try {
     const response = await fetch('/api/product-data');
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      throw new Error(`Failed to fetch product data: ${response.status}`);
     }
-    return await response.json();
+    
+    const data = await response.json();
+    
+    // Update cache
+    cachedProductData = data;
+    lastCacheTime = now;
+    
+    return data;
   } catch (error) {
-    console.error('Failed to fetch product data:', error);
+    console.error('Error fetching product data:', error);
     return { products: [] };
   }
 }
@@ -243,67 +346,53 @@ export function mapToApiOrderFormat(data) {
 /**
  * Simulates revenue scenarios with different price points
  */
-export async function simulateScenarios(data) {
+export async function simulateScenarios(data: any) {
+  console.log('simulateScenarios called with:', data);
+  
   try {
-    // Add timestamp to prevent browser caching
-    const timestamp = new Date().getTime();
-    data._timestamp = timestamp;
-    
-    // Convert data to the format expected by the API
-    const apiData = typeof data.locationId !== 'undefined' ? mapToApiOrderFormat(data) : data;
-    
-    // Log request being sent
-    console.log('Simulating revenue with data:', apiData);
-    
-    // Make sure required fields have values (not null or undefined)
-    if (apiData._ProductID === null || apiData._ProductID === undefined) {
-      apiData._ProductID = 1; // Default product ID
-    }
-    
-    if (apiData['Unit Price'] === null || apiData['Unit Price'] === undefined || isNaN(apiData['Unit Price'])) {
-      apiData['Unit Price'] = 100.0; // Default price
-    }
-    
-    if (apiData['Unit Cost'] === null || apiData['Unit Cost'] === undefined || isNaN(apiData['Unit Cost'])) {
-      apiData['Unit Cost'] = 50.0; // Default cost
-    }
-    
-    // Ensure values are proper types
-    apiData._ProductID = parseInt(String(apiData._ProductID), 10);
-    apiData['Unit Price'] = parseFloat(String(apiData['Unit Price']));
-    apiData['Unit Cost'] = parseFloat(String(apiData['Unit Cost']));
-    
-    // Ensure Location is present
-    if (!apiData.Location) {
-      apiData.Location = 'Central'; // Default location
-    }
-    
+    // Ensure Location is capitalized for API
+    const formattedData = {
+      ...data,
+      _timestamp: Date.now() // Add timestamp to avoid caching
+    };
+
+    // Direct URL to the simulate-revenue endpoint
     const response = await fetch('/api/simulate-revenue', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
       },
-      body: JSON.stringify(apiData),
-      cache: 'no-store'
+      body: JSON.stringify(formattedData),
     });
-    
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      throw new Error(
-        errorData?.error || `API error: ${response.status}`
-      );
+      console.error(`Simulate scenarios API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Error response:', errorText);
+      throw new Error(`Failed to simulate scenarios: ${response.status} ${response.statusText}`);
+    }
+
+    const jsonResponse = await response.json();
+    console.log('simulateScenarios API response:', JSON.stringify(jsonResponse, null, 2));
+    
+    // Verify the structure of the response
+    if (!jsonResponse) {
+      console.error('Simulation API returned null or undefined');
+      throw new Error('Simulation failed - empty response');
     }
     
-    const result = await response.json();
+    // Check if we have variations
+    if (jsonResponse.variations && Array.isArray(jsonResponse.variations)) {
+      console.log(`Found ${jsonResponse.variations.length} variations in the response`);
+    } else if (Array.isArray(jsonResponse)) {
+      console.log(`Response is an array with ${jsonResponse.length} items`);
+    } else {
+      console.warn('Response has no variations array and is not an array itself');
+    }
     
-    // Log response for debugging
-    console.log('Simulation response:', result);
-    
-    return result;
+    return jsonResponse;
   } catch (error) {
-    console.error('Failed to simulate scenarios:', error);
+    console.error('Error in simulateScenarios:', error);
     throw error;
   }
 }
@@ -367,4 +456,165 @@ export async function uploadFile(file: File) {
     console.error('Error uploading file:', error);
     throw error;
   }
+}
+
+// Sales Forecast API Functions
+
+export async function fetchForecastSales(
+  productId: string | number,
+  location: string,
+  unitPrice: number,
+  unitCost: number,
+  startDate: string,
+  endDate: string,
+  frequency: 'D' | 'W' | 'M' = 'D',
+  includeConfidence: boolean = true
+) {
+  try {
+    const response = await fetch('/api/forecast-sales', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        product_id: productId,
+        location,
+        unit_price: unitPrice,
+        unit_cost: unitCost,
+        start_date: startDate,
+        end_date: endDate,
+        frequency,
+        include_confidence: includeConfidence,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching sales forecast:', error);
+    throw error;
+  }
+}
+
+export async function fetchMultipleForecast(
+  products: Array<{
+    product_id: string | number;
+    location: string;
+    unit_price: number;
+    unit_cost: number;
+  }>,
+  startDate: string,
+  endDate: string,
+  frequency: 'D' | 'W' | 'M' = 'D'
+) {
+  try {
+    const response = await fetch('/api/forecast-multiple', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        products,
+        start_date: startDate,
+        end_date: endDate,
+        frequency,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching multiple forecast:', error);
+    throw error;
+  }
+}
+
+export async function fetchProductTrend(
+  productId: string | number,
+  location: string,
+  basePrice: number,
+  unitCost: number,
+  startDate: string,
+  endDate: string,
+  priceVariations: number[] = [0.8, 0.9, 1.0, 1.1, 1.2],
+  frequency: 'D' | 'W' | 'M' = 'D'
+) {
+  try {
+    const response = await fetch('/api/forecast-trend', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        product_id: productId,
+        location,
+        base_price: basePrice,
+        unit_cost: unitCost,
+        price_variations: priceVariations,
+        start_date: startDate,
+        end_date: endDate,
+        frequency,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching product trend:', error);
+    throw error;
+  }
+}
+
+// Helper Functions
+
+export function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getDefaultDateRange(days: number = 30): { startDate: string; endDate: string } {
+  const today = new Date();
+  
+  // Start date: today
+  const startDate = formatDate(today);
+  
+  // End date: specified days from today
+  const endDate = new Date(today);
+  endDate.setDate(today.getDate() + days);
+  
+  return {
+    startDate,
+    endDate: formatDate(endDate),
+  };
+}
+
+/**
+ * Helper function to get file information without revealing full paths in logs
+ * Returns just the filename, not the full path
+ */
+export function getApiFileInfo(filePath: string): string {
+  if (!filePath) return 'unknown';
+  
+  // Extract just the filename from the path
+  const parts = filePath.split(/[/\\]/);
+  return parts[parts.length - 1];
+}
+
+// Clear cache function to use when data file changes
+export function clearDataCache() {
+  cachedProducts = null;
+  cachedLocations = null;
+  cachedProductData = null;
+  console.log("Data cache cleared");
 } 
