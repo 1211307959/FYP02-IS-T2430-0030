@@ -584,24 +584,9 @@ def predict_revenue(data: Dict[str, Any]) -> Dict[str, Any]:
                     if unit_price > 100000:  # Upper price bound check
                         y_pred = 0
                     
-                    # Convert to quantity with realistic rounding
-                    # Ensure quantity decreases as price increases
+                    # Calculate quantity - PURE ML PREDICTION, NO ARTIFICIAL ROUNDING
                     if unit_price > 0:
-                        # Calculate raw quantity
-                        raw_quantity = y_pred / unit_price
-                        
-                        # Apply additional price-based quantity adjustment
-                        # Higher prices should result in lower quantities with more variability
-                        if price_ratio > 1.5:
-                            # Apply stronger quantization for higher prices
-                            # This ensures we get more distinct quantity values
-                            if raw_quantity < 10:
-                                predicted_quantity = max(0, int(raw_quantity))
-                            else:
-                                predicted_quantity = max(0, int(raw_quantity / 5) * 5)
-                        else:
-                            # Normal quantization for regular prices
-                            predicted_quantity = max(0, round(raw_quantity))
+                        predicted_quantity = y_pred / unit_price
                     else:
                         predicted_quantity = 0
                     
@@ -743,24 +728,9 @@ def predict_revenue(data: Dict[str, Any]) -> Dict[str, Any]:
             if unit_price > 100000:  # Upper price bound check
                 y_pred = 0
             
-            # Convert to quantity with realistic rounding
-            # Ensure quantity decreases as price increases
+            # Calculate quantity - PURE ML PREDICTION, NO ARTIFICIAL ROUNDING
             if unit_price > 0:
-                # Calculate raw quantity
-                raw_quantity = y_pred / unit_price
-                
-                # Apply additional price-based quantity adjustment
-                # Higher prices should result in lower quantities with more variability
-                if price_ratio > 1.5:
-                    # Apply stronger quantization for higher prices
-                    # This ensures we get more distinct quantity values
-                    if raw_quantity < 10:
-                        predicted_quantity = max(0, int(raw_quantity))
-                    else:
-                        predicted_quantity = max(0, int(raw_quantity / 5) * 5)
-                else:
-                    # Normal quantization for regular prices (keeping original logic for compatibility)
-                    predicted_quantity = max(0, round(raw_quantity))
+                predicted_quantity = y_pred / unit_price
             else:
                 predicted_quantity = 0
             

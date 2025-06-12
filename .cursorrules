@@ -53,6 +53,9 @@
 #    - ACHIEVEMENT: Eliminated artificial quantity processing, restored pure ML model predictions with natural variations
 #    - USER IMPACT: Custom forecasting now shows authentic day-to-day and week-to-week quantity patterns driven purely by ML model
 #    - PERFORMANCE: Same vectorized batch processing speed with improved prediction authenticity
+#    - SCENARIO PLANNER FIX: Also fixed identical issue in predict_revenue() function used by scenario planner
+#      * Before: High prices showed "Quantity: 0" with positive revenue (artificial rounding destroyed quantity)
+#      * After: All price scenarios show realistic quantities matching revenue/price ratios (pure ML predictions)
 #
 # 108. Custom Forecast Timeout Fix - Batch Processing for "All" Locations (Previous)
 #    - USER ISSUE: "frontend seems correct but... DOMException [TimeoutError]: The operation was aborted due to timeout"
