@@ -49,13 +49,13 @@ export async function POST(request: NextRequest) {
 
     console.log("Sending to Flask API:", JSON.stringify(transformedData, null, 2));
 
-    // Call Flask API
+    // Call Flask API with extended timeout for complex forecasts
     const response = await fetch(`${FLASK_API_URL}/forecast-sales`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(transformedData),
-      // Add timeout to prevent hanging
-      signal: AbortSignal.timeout(15000) // 15 seconds
+      // Extended timeout for accurate day-by-day processing (especially "All" locations + long ranges)
+      signal: AbortSignal.timeout(120000) // 2 minutes - allows for vectorized batch processing
     });
 
     // Check if response is ok

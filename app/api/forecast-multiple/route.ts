@@ -5,7 +5,6 @@ const FLASK_API_URL = process.env.FLASK_API_URL || 'http://localhost:5000';
 
 export async function POST(request: NextRequest) {
   // Declare variables outside try block so they're accessible in catch block
-  let timeoutMs = 30000;
   let transformedProducts: any[] = [];
   
   try {
@@ -52,12 +51,15 @@ export async function POST(request: NextRequest) {
     
     console.log(`Processing forecast for all ${productsToProcess.length} products (automatic: ${isAutomaticForecast})`);
     
-    // Conservative timeout for processing all products
-    timeoutMs = isAutomaticForecast ? 30000 : 45000; // Backend aggregated approach is much faster
+    // Removed timeout - let the ML processing complete naturally
+    console.log("Processing without timeout restrictions");
     
     const response = await fetch(`${FLASK_API_URL}/forecast-multiple`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Connection': 'keep-alive'
+      },
       body: JSON.stringify({
         products: productsToProcess, // Use optimized product selection
         start_date: requestData.start_date,
@@ -65,7 +67,8 @@ export async function POST(request: NextRequest) {
         frequency: requestData.frequency,
         include_confidence: requestData.include_confidence !== false
       }),
-      signal: AbortSignal.timeout(timeoutMs)
+      // Extended timeouts for ML processing
+      keepalive: true
     });
 
     // Check if response is ok
@@ -101,27 +104,10 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error in forecast-multiple API route:', error);
     
-    // Return actual error instead of fallback data
-    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-      const usedTimeout = timeoutMs / 1000;
-      const totalProducts = transformedProducts.length || 0;
-      return NextResponse.json(
-        { 
-          error: `Processing timed out after ${usedTimeout}s for ${totalProducts} products. The system is optimized for fast processing - please try again.`,
-          timeout_info: {
-            products_processed: totalProducts,
-            timeout_used: usedTimeout,
-            approach: totalProducts > 30 ? "aggregated_business_forecast" : "detailed_individual_forecast",
-            suggestion: "Please try again - the aggregated approach should be much faster"
-          }
-        },
-        { status: 408 }
-      );
-    } else {
-      return NextResponse.json(
-        { error: `Internal server error: ${error.message}` },
-        { status: 500 }
-      );
-    }
+    // Return actual error (no timeout handling since timeout is removed)
+    return NextResponse.json(
+      { error: `Internal server error: ${error.message}` },
+      { status: 500 }
+    );
   }
 } 

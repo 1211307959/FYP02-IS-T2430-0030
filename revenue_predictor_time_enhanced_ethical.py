@@ -73,6 +73,88 @@ def validate_and_convert_input(data: Dict[str, Any]) -> Dict[str, Any]:
     
     return data
 
+def get_available_locations_and_products() -> Tuple[List[str], List[int]]:
+    """
+    Dynamically load available locations and products from ALL CSV files in the data folder.
+    This ensures the system can adapt to new data without hardcoded values.
+    
+    Returns:
+        Tuple containing:
+        - locations: List of available location names
+        - products: List of available product IDs
+    """
+    try:
+        import pandas as pd
+        import os
+        
+        # Load from ALL CSV files in the data directory (same as other functions)
+        data_dir = 'public/data'
+        if os.path.exists(data_dir):
+            csv_files = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
+            
+            if csv_files:
+                all_locations = set()
+                all_products = set()
+                
+                for file in csv_files:
+                    file_path = os.path.join(data_dir, file)
+                    try:
+                        df = pd.read_csv(file_path)
+                        if 'Location' in df.columns:
+                            all_locations.update(df['Location'].unique())
+                        if '_ProductID' in df.columns:
+                            all_products.update(df['_ProductID'].unique())
+                    except Exception as e:
+                        print(f"Warning: Could not load {file}: {e}")
+                        continue
+                
+                if all_locations and all_products:
+                    # Filter out any null/empty values
+                    locations = [loc for loc in all_locations if loc and not pd.isna(loc)]
+                    products = [prod for prod in all_products if prod and not pd.isna(prod)]
+                    
+                    locations = sorted(locations)
+                    products = sorted(products)
+                    print(f"Loaded from data folder: {len(locations)} locations, {len(products)} products")
+                    return locations, products
+        
+        # Fallback to trainingdataset.csv if data folder approach fails
+        dataset_path = 'trainingdataset.csv'
+        if os.path.exists(dataset_path):
+            df = pd.read_csv(dataset_path)
+            
+            # Get unique locations and products
+            locations = df['Location'].unique().tolist() if 'Location' in df.columns else []
+            products = df['_ProductID'].unique().tolist() if '_ProductID' in df.columns else []
+            
+            # Filter out any null/empty values
+            locations = [loc for loc in locations if loc and not pd.isna(loc)]
+            products = [prod for prod in products if prod and not pd.isna(prod)]
+            
+            locations = sorted(locations)
+            products = sorted(products)
+            print(f"Loaded from trainingdataset.csv: {len(locations)} locations, {len(products)} products")
+            return locations, products
+        else:
+            # Fallback to encoders if dataset not available
+            try:
+                encoders_path = 'revenue_encoders_time_enhanced_ethical.pkl'
+                encoders = joblib.load(encoders_path)
+                locations = list(encoders.get('Location', {}).classes_) if 'Location' in encoders else []
+                products = list(encoders.get('_ProductID', {}).classes_) if '_ProductID' in encoders else []
+                print(f"Loaded from encoders: {len(locations)} locations, {len(products)} products")
+                return locations, products
+            except:
+                # Final fallback to known values
+                print("Using fallback values: 5 locations, 47 products")
+                return ['Central', 'East', 'North', 'South', 'West'], list(range(1, 48))
+                
+    except Exception as e:
+        print(f"Warning: Could not load locations/products dynamically: {str(e)}")
+        # Return known fallback values
+        print("Using fallback values: 5 locations, 47 products")
+        return ['Central', 'East', 'North', 'South', 'West'], list(range(1, 48))
+
 def load_model() -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
     """
     Load the trained ethical time-enhanced model and associated data files.
@@ -769,7 +851,7 @@ def predict_revenue_for_forecasting(data: Dict[str, Any]) -> Dict[str, Any]:
                 location_data = data.copy()
                 location_data['Location'] = loc
                 
-                # Make prediction for this location
+                # Make prediction for this location (frequency scaling will be applied automatically)
                 location_result = predict_revenue_for_forecasting(location_data)
                 
                 if 'error' not in location_result:
@@ -1265,6 +1347,281 @@ def simulate_annual_revenue(base_data, min_price_factor=0.5, max_price_factor=2.
         import traceback
         traceback.print_exc()
         return []
+
+def predict_revenue_batch(batch_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Predict revenue for multiple data points using vectorized batch inference.
+    
+    This function provides massive performance improvements by processing all predictions
+    in a single model.predict() call instead of individual calls. Ideal for forecasting
+    scenarios where you need predictions for many products/dates.
+    
+    Handles "All" location by expanding to all available locations automatically.
+    
+    Args:
+        batch_data (List[Dict[str, Any]]): List of input data dictionaries, each containing:
+            - Unit Price (float): Product unit price
+            - Unit Cost (float): Product unit cost
+            - _ProductID (str/int): Product identifier
+            - Location (str): Location name or "All" for all locations
+            - Month (int): Month (1-12)
+            - Day (int): Day of month (1-31)
+            - Weekday (str): Day name (e.g., "Monday")
+            - Year (int): Year
+    
+    Returns:
+        List[Dict[str, Any]]: List of prediction results, each containing:
+            - predicted_revenue (float): Predicted revenue amount
+            - estimated_quantity (int): Estimated quantity sold
+            - total_cost (float): Total cost for the transaction
+            - profit (float): Estimated profit
+            - profit_margin_pct (float): Profit margin percentage
+            - input_index (int): Index of the input data for matching results
+            - location (str, optional): Actual location used for "All" expansions
+    
+    Raises:
+        ValueError: If batch_data is empty or contains invalid data
+        FileNotFoundError: If model files are not found
+        RuntimeError: If batch prediction fails
+        
+    Example:
+        >>> batch_inputs = [
+        ...     {"Unit Price": 150.0, "Unit Cost": 75.0, "_ProductID": "12", "Location": "North", ...},
+        ...     {"Unit Price": 200.0, "Unit Cost": 100.0, "_ProductID": "24", "Location": "All", ...}
+        ... ]
+        >>> results = predict_revenue_batch(batch_inputs)
+        >>> print(f"Processed {len(results)} predictions in single batch call")
+    """
+    try:
+        if not batch_data or len(batch_data) == 0:
+            raise ValueError("Batch data cannot be empty")
+        
+        # Load the model once for the entire batch
+        model_data, encoders, reference_data = load_model()
+        model = model_data['model']
+        
+        # Get available locations from encoders
+        available_locations = list(encoders.get('Location', {}).classes_) if 'Location' in encoders else []
+        
+        # Get feature names
+        feature_names = None
+        if 'features' in model_data:
+            feature_names = model_data['features']
+        elif 'feature_names' in model_data:
+            feature_names = model_data['feature_names']
+        elif hasattr(model, 'feature_name_'):
+            feature_names = model.feature_name_
+        elif hasattr(model, 'feature_names_'):
+            feature_names = model.feature_names_
+        
+        # Expand batch data to handle "All" locations
+        expanded_batch_data = []
+        original_indices = []
+        
+        for i, data in enumerate(batch_data):
+            if data.get('Location') == 'All':
+                # Expand to all available locations
+                for location in available_locations:
+                    expanded_data = data.copy()
+                    expanded_data['Location'] = location
+                    expanded_batch_data.append(expanded_data)
+                    original_indices.append(i)
+            else:
+                # Keep as is
+                expanded_batch_data.append(data)
+                original_indices.append(i)
+        
+        # Process all inputs and collect them into a single DataFrame
+        processed_batch = []
+        valid_indices = []
+        valid_original_indices = []
+        
+        for i, data in enumerate(expanded_batch_data):
+            try:
+                # Create a copy to avoid modifying original
+                data_copy = data.copy()
+                
+                # Validate and convert input
+                validated_data = validate_and_convert_input(data_copy)
+                
+                # Preprocess data
+                processed = preprocess(validated_data, model_data, encoders, reference_data)
+                
+                # Select required features
+                if feature_names:
+                    # Get all available features
+                    missing_features = set(feature_names) - set(processed.columns)
+                    if missing_features:
+                        for feature in missing_features:
+                            processed[feature] = 0
+                    
+                    X_row = processed[feature_names]
+                else:
+                    # If no feature names are available, use all columns
+                    X_row = processed
+                
+                # Add to batch
+                processed_batch.append(X_row.iloc[0])  # Get the single row as Series
+                valid_indices.append(i)
+                valid_original_indices.append(original_indices[i])
+                
+            except Exception as e:
+                # Skip invalid inputs but continue processing
+                print(f"Warning: Skipping batch item {i} due to error: {str(e)}")
+                continue
+        
+        if not processed_batch:
+            raise ValueError("No valid inputs in batch after preprocessing")
+        
+        # Convert to DataFrame for batch prediction
+        X_batch = pd.DataFrame(processed_batch)
+        
+        # Make batch prediction - THIS IS THE KEY OPTIMIZATION
+        # Instead of hundreds of individual model.predict() calls, we make 1 batch call
+        y_pred_log_batch = model.predict(X_batch)
+        
+        # Apply inverse log transformation to get actual revenue
+        y_pred_batch = np.expm1(y_pred_log_batch)
+        
+        # Process results for each prediction
+        individual_results = []
+        for idx, (expanded_idx, original_idx, y_pred) in enumerate(zip(valid_indices, valid_original_indices, y_pred_batch)):
+            try:
+                expanded_data = expanded_batch_data[expanded_idx]
+                original_data = batch_data[original_idx]
+                
+                # Get input values
+                unit_price = float(expanded_data.get('Unit Price', 0))
+                unit_cost = float(expanded_data.get('Unit Cost', 0))
+                product_id = expanded_data.get('_ProductID')
+                location = expanded_data.get('Location')
+                
+                # Get product reference price for elasticity
+                product_avg_price = None
+                if product_id is not None:
+                    product_id = int(product_id)
+                    
+                if 'product_price_avg' in reference_data and product_id in reference_data['product_price_avg']:
+                    product_avg_price = reference_data['product_price_avg'][product_id]
+                else:
+                    # Use all products average as fallback
+                    if 'product_price_avg' in reference_data:
+                        product_avg_price = sum(reference_data['product_price_avg'].values()) / len(reference_data['product_price_avg'])
+                    else:
+                        product_avg_price = 5000.0  # Realistic fallback
+                
+                # Apply enhanced price elasticity
+                price_ratio = unit_price / product_avg_price if product_avg_price > 0 else unit_price / 100.0
+                
+                # Apply elasticity adjustments
+                if price_ratio > 1.0:
+                    # Higher than average price - apply elasticity
+                    elasticity_factor = np.exp(-0.5 * (price_ratio - 1.0))
+                    y_pred = y_pred * elasticity_factor
+                    
+                    # For very high prices, apply even stronger elasticity
+                    if price_ratio > 3.0:
+                        additional_factor = np.exp(-1.0 * (price_ratio - 3.0))
+                        y_pred = y_pred * additional_factor
+                
+                # For extreme prices, adjust prediction
+                if unit_price > 100000:
+                    y_pred = 0
+                
+                # Calculate quantity - PURE ML PREDICTION, NO ARTIFICIAL ROUNDING
+                if unit_price > 0:
+                    predicted_quantity = y_pred / unit_price
+                else:
+                    predicted_quantity = 0
+                
+                # KEEP ORIGINAL ML REVENUE PREDICTION
+                adjusted_revenue = y_pred
+                
+                # Calculate derived metrics
+                total_cost = predicted_quantity * unit_cost
+                profit = adjusted_revenue - total_cost
+                profit_margin_pct = (profit / adjusted_revenue) * 100 if adjusted_revenue > 0 else 0
+                
+                # Create result
+                result = {
+                    'predicted_revenue': float(adjusted_revenue),
+                    'estimated_quantity': float(predicted_quantity),  # Keep decimal precision
+                    'total_cost': float(total_cost),
+                    'profit': float(profit),
+                    'profit_margin_pct': float(profit_margin_pct),
+                    'price_ratio': float(price_ratio),
+                    'input_index': original_idx,
+                    'location': location,
+                    'was_all_location': original_data.get('Location') == 'All'
+                }
+                
+                individual_results.append(result)
+                
+            except Exception as e:
+                # Skip this result but continue processing
+                print(f"Warning: Error processing batch result {idx}: {str(e)}")
+                continue
+        
+        # Aggregate results for "All" location inputs
+        final_results = []
+        processed_indices = set()
+        
+        for original_idx in range(len(batch_data)):
+            if original_idx in processed_indices:
+                continue
+                
+            original_data = batch_data[original_idx]
+            
+            if original_data.get('Location') == 'All':
+                # Aggregate all location results for this input
+                location_results = [r for r in individual_results if r['input_index'] == original_idx and r['was_all_location']]
+                
+                if location_results:
+                    # Sum up all location results
+                    total_revenue = sum(r['predicted_revenue'] for r in location_results)
+                    total_quantity = sum(r['estimated_quantity'] for r in location_results)
+                    total_cost = sum(r['total_cost'] for r in location_results)
+                    total_profit = sum(r['profit'] for r in location_results)
+                    
+                    # Calculate aggregated profit margin
+                    profit_margin_pct = (total_profit / total_revenue) * 100 if total_revenue > 0 else 0
+                    
+                    # Use average price ratio
+                    avg_price_ratio = sum(r['price_ratio'] for r in location_results) / len(location_results)
+                    
+                    aggregated_result = {
+                        'predicted_revenue': float(total_revenue),
+                        'estimated_quantity': float(total_quantity),  # Keep decimal precision
+                        'total_cost': float(total_cost),
+                        'profit': float(total_profit),
+                        'profit_margin_pct': float(profit_margin_pct),
+                        'price_ratio': float(avg_price_ratio),
+                        'input_index': original_idx,
+                        'locations_aggregated': True,
+                        'location_count': len(location_results)
+                    }
+                    
+                    final_results.append(aggregated_result)
+                    processed_indices.add(original_idx)
+            else:
+                # Single location result
+                location_results = [r for r in individual_results if r['input_index'] == original_idx and not r['was_all_location']]
+                
+                if location_results:
+                    # Should be exactly one result
+                    result = location_results[0]
+                    # Remove internal fields
+                    result.pop('was_all_location', None)
+                    result.pop('location', None)
+                    final_results.append(result)
+                    processed_indices.add(original_idx)
+        
+        return final_results
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise RuntimeError(f"Batch prediction failed: {str(e)}")
 
 # Test the module if run directly
 if __name__ == "__main__":

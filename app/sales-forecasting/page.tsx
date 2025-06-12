@@ -166,8 +166,7 @@ export default function SalesForecastingPage() {
     }
   }
   const [metricView, setMetricView] = useState<"revenue" | "quantity" | "profit" | "all" | "none">("revenue")
-  const [showConfidenceIntervals, setShowConfidenceIntervals] = useState<boolean>(true)
-  const [showSeasonalityTrend, setShowSeasonalityTrend] = useState<boolean>(true)
+  // Removed confidence intervals and seasonality trend toggles
   const [showRevenue, setShowRevenue] = useState<boolean>(true)
   const [showProfit, setShowProfit] = useState<boolean>(true)
   // Custom forecast metric toggles - allow multiple metrics simultaneously
@@ -1219,14 +1218,7 @@ export default function SalesForecastingPage() {
       
       console.log(`Prepared ${chartData.length} chart data points`);
       
-      // Calculate and add seasonal trend if enabled
-      if (showSeasonalityTrend && chartData.length > 0) {
-        const seasonalTrend = calculateSeasonalTrend(source.forecast);
-        chartData = chartData.map((item, index) => ({
-          ...item,
-          seasonalTrend: seasonalTrend[index]
-        }));
-      }
+      // Removed seasonality trend calculation
       
       return chartData;
     } catch (error) {
@@ -1439,46 +1431,15 @@ export default function SalesForecastingPage() {
             <CardHeader>
               <CardTitle>Automatic Forward-Looking Forecast</CardTitle>
               <CardDescription>
-                View overall business forecast for the next 30 days based on historical patterns
+                View overall business forecast for the next 1 year based on historical patterns
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
                 <div className="flex flex-col md:flex-row items-start gap-4 mb-6">
                   <div className="w-full md:w-1/2">
-                    <Label className="mb-2 block">Visualization Options</Label>
-                    <div className="flex items-center justify-between py-2">
-                      <div className="flex items-center">
-                        <Label htmlFor="confidence-intervals" className="text-sm">
-                        Confidence Intervals
-                      </Label>
-                        <div className="ml-2 text-gray-500 cursor-help" title="Confidence intervals show the range within which actual values are likely to fall, representing prediction uncertainty. The shaded area indicates lower and upper bounds of predictions.">
-                          <span className="rounded-full border border-gray-400 px-1.5 text-xs">?</span>
-                    </div>
-                      </div>
-                      <div className="relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary" 
-                           onClick={() => setShowConfidenceIntervals(!showConfidenceIntervals)}
-                           style={{ backgroundColor: showConfidenceIntervals ? '#16a34a' : '#d1d5db' }}>
-                        <span className={`${showConfidenceIntervals ? 'translate-x-4' : 'translate-x-0'} inline-block h-3 w-3 rounded-full bg-white transition-transform`}></span>
-                    </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between py-2">
-                      <div className="flex items-center">
-                        <Label htmlFor="seasonality-trend" className="text-sm">
-                        Seasonality Trend
-                      </Label>
-                        <div className="ml-2 text-gray-500 cursor-help" title="Seasonality trend shows recurring patterns in your data based on day of week, month, or other cyclical factors. This helps identify when sales consistently rise or fall due to regular time-based patterns.">
-                          <span className="rounded-full border border-gray-400 px-1.5 text-xs">?</span>
-                        </div>
-                      </div>
-                      <div className="relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary" 
-                           onClick={() => setShowSeasonalityTrend(!showSeasonalityTrend)}
-                           style={{ backgroundColor: showSeasonalityTrend ? '#16a34a' : '#d1d5db' }}>
-                        <span className={`${showSeasonalityTrend ? 'translate-x-4' : 'translate-x-0'} inline-block h-3 w-3 rounded-full bg-white transition-transform`}></span>
-                    </div>
+                    {/* Removed Visualization Options toggles */}
                   </div>
-                </div>
 
                   <div className="w-full md:w-1/2 flex justify-end items-end h-full">
                     <Button onClick={handleRefreshForecastClick} disabled={loading || requestInProgressRef.current}>
@@ -1614,20 +1575,7 @@ export default function SalesForecastingPage() {
                               />
                             )}
                             
-                            {/* Seasonal Trend */}
-                            {showSeasonalityTrend && (
-                              <Line
-                                type="monotone"
-                                dataKey="seasonalTrend"
-                          stroke="#ff7300"
-                          dot={false}
-                          activeDot={false}
-                                strokeWidth={2}
-                                strokeDasharray="5 5"
-                          name="Seasonal Trend"
-                          yAxisId="left"
-                              />
-                            )}
+                            {/* Removed Seasonal Trend line */}
                           </RechartsLineChart>
                         </ResponsiveContainer>
                       ) : (
@@ -1941,20 +1889,7 @@ export default function SalesForecastingPage() {
                         />
                       )}
                       
-                      {/* Seasonal Trend */}
-                            {showSeasonalityTrend && (
-                              <Line
-                                type="monotone"
-                                dataKey="seasonalTrend"
-                          stroke="#ff7300"
-                          dot={false}
-                          activeDot={false}
-                                strokeWidth={2}
-                                strokeDasharray="5 5"
-                          name="Seasonal Trend"
-                          yAxisId="left"
-                              />
-                            )}
+                      {/* Removed Seasonal Trend line */}
                     </RechartsLineChart>
                         </ResponsiveContainer>
                       </div>
