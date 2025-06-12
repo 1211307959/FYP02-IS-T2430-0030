@@ -10,11 +10,14 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Upload, FileUp, BarChart, AlertCircle, Check, Database } from "lucide-react"
+import { Upload, FileUp, BarChart, AlertCircle, Check, Database, Calendar } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { getProducts, getLocations, loadSampleCsvData } from "@/lib/api"
 import Papa from 'papaparse'
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
 
 // Define a type for our CSV row data
 type CsvRowData = {
@@ -41,9 +44,7 @@ export default function DataInputPage() {
     unitCost: "",
     unitPrice: "",
     totalRevenue: "",
-    month: "",
-    day: "",
-    weekday: "",
+    date: undefined as Date | undefined,
     location: "",
     productId: "",
   })
@@ -52,6 +53,8 @@ export default function DataInputPage() {
   const [products, setProducts] = useState<{id: string, name: string}[]>([])
   const [locations, setLocations] = useState<{id: string, name: string}[]>([])
   const [isLoadingOptions, setIsLoadingOptions] = useState(true)
+  const [isCustomProduct, setIsCustomProduct] = useState(false)
+  const [isCustomLocation, setIsCustomLocation] = useState(false)
   const [error, setError] = useState("")
   const [predictionResults, setPredictionResults] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -66,9 +69,10 @@ export default function DataInputPage() {
         const productsData = await getProducts()
         setProducts(productsData)
         
-        // Fetch locations
+        // Fetch locations and filter out "All Locations" for manual entry
         const locationsData = await getLocations()
-        setLocations(locationsData)
+        const filteredLocations = locationsData.filter((location: {id: string, name: string}) => location.id !== 'All')
+        setLocations(filteredLocations)
       } catch (err) {
         console.error("Error loading options:", err)
         setError("Failed to load product and location options")
@@ -80,21 +84,16 @@ export default function DataInputPage() {
     fetchOptions()
   }, [])
   
-  // Get month options
-  const monthOptions = [
-    { value: "1", label: "January" },
-    { value: "2", label: "February" },
-    { value: "3", label: "March" },
-    { value: "4", label: "April" },
-    { value: "5", label: "May" },
-    { value: "6", label: "June" },
-    { value: "7", label: "July" },
-    { value: "8", label: "August" },
-    { value: "9", label: "September" },
-    { value: "10", label: "October" },
-    { value: "11", label: "November" },
-    { value: "12", label: "December" },
-  ]
+  // Helper function to get date components
+  const getDateComponents = (date: Date) => {
+    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1, // getMonth() returns 0-11
+      day: date.getDate(),
+      weekday: weekdays[date.getDay()]
+    }
+  }
 
   // Handle parsing CSV file with Papa Parse
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,56 +146,93 @@ export default function DataInputPage() {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleManualSubmit = (e: React.FormEvent) => {
+  const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     try {
       // Validate all required fields are present
-      const requiredFields = ['unitCost', 'unitPrice', 'totalRevenue', 'month', 'day', 'weekday', 'location', 'productId']
-      const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData])
+      const requiredFields = ['unitCost', 'unitPrice', 'totalRevenue', 'date', 'location', 'productId']
+      const missingFields = requiredFields.filter(field => {
+        if (field === 'date') return !formData.date
+        return !formData[field as keyof typeof formData]
+      })
       
       if (missingFields.length > 0) {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`)
       }
       
-      // Create new entry for preview data
+      // Extract date components from the selected date
+      const dateComponents = getDateComponents(formData.date!)
+      
+      // Prepare data for API call (matching the expected backend format)
+      const apiData = {
+        location: formData.location,
+        _ProductID: formData.productId,
+        unit_cost: Number(formData.unitCost),
+        unit_price: Number(formData.unitPrice),
+        total_revenue: Number(formData.totalRevenue),
+        year: dateComponents.year,
+        month: dateComponents.month,
+        day: dateComponents.day,
+        weekday: dateComponents.weekday,
+      }
+      
+      // Call the manual entry API endpoint
+      const response = await fetch('/api/manual-entry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiData)
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `API call failed: ${response.statusText}`)
+      }
+      
+      const result = await response.json()
+      
+      // Create new entry for preview data (using the frontend display format)
       const newEntry: CsvRowData = {
-      id: previewData.length + 1,
+        id: previewData.length + 1,
         Location: formData.location,
         _ProductID: formData.productId,
         "Unit Cost": Number(formData.unitCost),
         "Unit Price": Number(formData.unitPrice),
         "Total Revenue": Number(formData.totalRevenue),
-        Year: new Date().getFullYear(),
-        Month: Number(formData.month),
-        Day: Number(formData.day),
-        Weekday: formData.weekday,
-    }
+        Year: dateComponents.year,
+        Month: dateComponents.month,
+        Day: dateComponents.day,
+        Weekday: dateComponents.weekday,
+      }
 
-    setPreviewData([...previewData, newEntry])
+      setPreviewData([...previewData, newEntry])
 
-    toast({
-      title: "Data added successfully",
-      description: "Your manual entry has been added to the dataset.",
-    })
+      toast({
+        title: "Data saved successfully",
+        description: `Manual entry has been saved to server: ${result.filename}`,
+      })
 
-    // Reset form
-    setFormData({
-      unitCost: "",
-      unitPrice: "",
-      totalRevenue: "",
-      month: "",
-      day: "",
-      weekday: "",
-      location: "",
-      productId: "",
-    })
+      // Reset form
+      setFormData({
+        unitCost: "",
+        unitPrice: "",
+        totalRevenue: "",
+        date: undefined,
+        location: "",
+        productId: "",
+      })
+      
+      // Reset custom input states
+      setIsCustomProduct(false)
+      setIsCustomLocation(false)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
       setError(errorMessage)
       toast({
         variant: "destructive",
-        title: "Error adding data",
+        title: "Error saving data",
         description: errorMessage,
       })
     }
@@ -604,43 +640,115 @@ export default function DataInputPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
                   <div className="grid gap-1 sm:gap-2">
                     <Label htmlFor="productId" className="text-xs sm:text-sm">Product</Label>
-                    <Select
-                      value={formData.productId}
-                      onValueChange={(value) => handleSelectChange("productId", value)}
-                      disabled={isLoadingOptions}
-                    >
-                      <SelectTrigger id="productId" className="text-xs sm:text-sm h-8 sm:h-10">
-                        <SelectValue placeholder="Select a product" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[40vh]">
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id} className="text-xs sm:text-sm">
-                            {product.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {isCustomProduct ? (
+                      <div className="flex gap-2">
+                        <Input
+                          id="productId"
+                          name="productId"
+                          value={formData.productId}
+                          onChange={handleInputChange}
+                          placeholder="Enter new product name"
+                          className="text-xs sm:text-sm h-8 sm:h-10 flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setIsCustomProduct(false)
+                            setFormData(prev => ({ ...prev, productId: "" }))
+                          }}
+                          className="h-8 sm:h-10 px-2"
+                        >
+                          ↩
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Select
+                          value={formData.productId}
+                          onValueChange={(value) => handleSelectChange("productId", value)}
+                          disabled={isLoadingOptions}
+                        >
+                          <SelectTrigger id="productId" className="text-xs sm:text-sm h-8 sm:h-10 flex-1">
+                            <SelectValue placeholder="Select a product" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[40vh]">
+                            {products.map((product) => (
+                              <SelectItem key={product.id} value={product.id} className="text-xs sm:text-sm">
+                                {product.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsCustomProduct(true)}
+                          className="h-8 sm:h-10 px-2"
+                        >
+                          +
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid gap-1 sm:gap-2">
                     <Label htmlFor="location" className="text-xs sm:text-sm">Location</Label>
-                    <Select
-                      value={formData.location}
-                      onValueChange={(value) => handleSelectChange("location", value)}
-                      disabled={isLoadingOptions}
-                    >
-                      <SelectTrigger id="location" className="text-xs sm:text-sm h-8 sm:h-10">
-                        <SelectValue placeholder="Select a location" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[40vh]">
-                        {locations.map((location) => (
-                          <SelectItem key={location.id} value={location.id} className="text-xs sm:text-sm">
-                            {location.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                </div>
+                    {isCustomLocation ? (
+                      <div className="flex gap-2">
+                        <Input
+                          id="location"
+                          name="location"
+                          value={formData.location}
+                          onChange={handleInputChange}
+                          placeholder="Enter new location name"
+                          className="text-xs sm:text-sm h-8 sm:h-10 flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setIsCustomLocation(false)
+                            setFormData(prev => ({ ...prev, location: "" }))
+                          }}
+                          className="h-8 sm:h-10 px-2"
+                        >
+                          ↩
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Select
+                          value={formData.location}
+                          onValueChange={(value) => handleSelectChange("location", value)}
+                          disabled={isLoadingOptions}
+                        >
+                          <SelectTrigger id="location" className="text-xs sm:text-sm h-8 sm:h-10 flex-1">
+                            <SelectValue placeholder="Select a location" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[40vh]">
+                            {locations.map((location) => (
+                              <SelectItem key={location.id} value={location.id} className="text-xs sm:text-sm">
+                                {location.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsCustomLocation(true)}
+                          className="h-8 sm:h-10 px-2"
+                        >
+                          +
+                        </Button>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="grid gap-1 sm:gap-2">
                     <Label htmlFor="unitPrice" className="text-xs sm:text-sm">Unit Price ($)</Label>
@@ -685,58 +793,33 @@ export default function DataInputPage() {
                 </div>
 
                   <div className="grid gap-1 sm:gap-2">
-                    <Label htmlFor="month" className="text-xs sm:text-sm">Month</Label>
-                    <Select
-                      value={formData.month}
-                      onValueChange={(value) => handleSelectChange("month", value)}
-                    >
-                      <SelectTrigger id="month" className="text-xs sm:text-sm h-8 sm:h-10">
-                      <SelectValue placeholder="Select month" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {monthOptions.map((month) => (
-                          <SelectItem key={month.value} value={month.value} className="text-xs sm:text-sm">
-                          {month.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                  <div className="grid gap-1 sm:gap-2">
-                    <Label htmlFor="day" className="text-xs sm:text-sm">Day</Label>
-                  <Input
-                    id="day"
-                    name="day"
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={formData.day}
-                    onChange={handleInputChange}
-                      className="text-xs sm:text-sm h-8 sm:h-10"
-                  />
-                </div>
-
-                  <div className="grid gap-1 sm:gap-2">
-                    <Label htmlFor="weekday" className="text-xs sm:text-sm">Weekday</Label>
-                    <Select
-                      value={formData.weekday}
-                      onValueChange={(value) => handleSelectChange("weekday", value)}
-                    >
-                      <SelectTrigger id="weekday" className="text-xs sm:text-sm h-8 sm:h-10">
-                      <SelectValue placeholder="Select weekday" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Monday" className="text-xs sm:text-sm">Monday</SelectItem>
-                        <SelectItem value="Tuesday" className="text-xs sm:text-sm">Tuesday</SelectItem>
-                        <SelectItem value="Wednesday" className="text-xs sm:text-sm">Wednesday</SelectItem>
-                        <SelectItem value="Thursday" className="text-xs sm:text-sm">Thursday</SelectItem>
-                        <SelectItem value="Friday" className="text-xs sm:text-sm">Friday</SelectItem>
-                        <SelectItem value="Saturday" className="text-xs sm:text-sm">Saturday</SelectItem>
-                        <SelectItem value="Sunday" className="text-xs sm:text-sm">Sunday</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                    <Label htmlFor="date" className="text-xs sm:text-sm">Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal text-xs sm:text-sm h-8 sm:h-10",
+                            !formData.date && "text-muted-foreground"
+                          )}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {formData.date ? format(formData.date, "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <input
+                          type="date"
+                          value={formData.date ? format(formData.date, "yyyy-MM-dd") : ""}
+                          onChange={(e) => {
+                            const date = e.target.value ? new Date(e.target.value) : undefined
+                            setFormData(prev => ({ ...prev, date }))
+                          }}
+                          className="w-full p-3 border-0 outline-none"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
               </CardContent>
               <CardFooter className="p-4 sm:p-6 flex justify-end">
