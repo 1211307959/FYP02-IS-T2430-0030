@@ -91,6 +91,7 @@ docs/
   - `/forecast-sales` - Custom sales forecasting
   - `/insights` - Business insights
   - `/locations`, `/products` - Dynamic data access
+  - `/manual-entry` - Save manual data entry (CSV generation)
 
 ### **2. ML Prediction Engine**
 - **File**: `revenue_predictor_time_enhanced_ethical.py`
@@ -124,6 +125,8 @@ docs/
 5. **Frequency-Aware Forecasting** - Daily/Weekly/Monthly with proper aggregation
 6. **Vectorized Performance** - Enterprise-scale handling (100k+ rows)
 7. **Error-Resilient Architecture** - Graceful handling of edge cases
+8. **Interactive Data Visualization** - Dynamic charts without export functionality
+8. **Manual Data Entry** - Calendar picker with custom product and location support (Update #110)
 
 ### **✅ Business Intelligence**
 1. **Automatic Sales Forecasting** - Full business portfolio analysis

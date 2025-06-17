@@ -52,5 +52,41 @@
     "predicted_at": "2025-06-13T01:41:30.593891",
     "status": "pending",
     "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "PRICE001",
+    "title": "Your Prices Are All Over the Place",
+    "predicted_value": 0.11597248115993972,
+    "prediction_type": "price_standardization_impact",
+    "predicted_at": "2025-06-13T19:45:33.609799",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "REV001",
+    "title": "Your Business Can Make More Money",
+    "predicted_value": -5467231.447451425,
+    "prediction_type": "revenue_optimization_potential",
+    "predicted_at": "2025-06-13T19:45:33.641488",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "PRICE001",
+    "title": "Your Prices Are All Over the Place",
+    "predicted_value": 0.11597248115993972,
+    "prediction_type": "price_standardization_impact",
+    "predicted_at": "2025-06-16T17:32:42.527544",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "REV001",
+    "title": "Your Business Can Make More Money",
+    "predicted_value": -5467231.447451425,
+    "prediction_type": "revenue_optimization_potential",
+    "predicted_at": "2025-06-16T17:32:42.542105",
+    "status": "pending",
+    "tracking_period_weeks": 4
   }
 ]

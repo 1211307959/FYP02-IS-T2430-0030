@@ -8,13 +8,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ModeToggle } from "@/components/mode-toggle"
 import { useToast } from "@/components/ui/use-toast"
-import { Save, Trash2, Upload, RefreshCw } from "lucide-react"
+import { Save, Upload, RefreshCw } from "lucide-react"
 import { getDataFiles, selectDataFile, reloadDataFiles, uploadFile } from "@/lib/api"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
@@ -31,14 +28,6 @@ export default function SettingsPage() {
     city: "Data Science City",
     state: "DS",
     zip: "10101",
-  })
-
-  // Notification settings state
-  const [notifications, setNotifications] = useState({
-    emailAlerts: true,
-    weeklyReports: true,
-    insightAlerts: true,
-    dataUpdates: false,
   })
 
   // Dataset state
@@ -98,14 +87,6 @@ export default function SettingsPage() {
     setProfile((prev) => ({
       ...prev,
       [name]: value,
-    }))
-  }
-
-  // Handle notification toggle
-  const handleNotificationToggle = (key: string) => {
-    setNotifications((prev) => ({
-      ...prev,
-      [key]: !prev[key as keyof typeof prev],
     }))
   }
 
@@ -205,14 +186,6 @@ export default function SettingsPage() {
     })
   }
 
-  // Handle notification settings save
-  const handleNotificationSave = () => {
-    toast({
-      title: "Notification settings updated",
-      description: "Your notification preferences have been saved successfully.",
-    })
-  }
-
   // Handle file upload button click
   const handleUploadClick = () => {
     // Trigger the hidden file input
@@ -221,38 +194,11 @@ export default function SettingsPage() {
     }
   }
   
-  // Handle delete dataset button click
-  const handleDeleteClick = (datasetId: number) => {
-    const dataset = datasets.find(d => d.id === datasetId)
-    if (dataset?.status === "Active") {
-      toast({
-        title: "Cannot delete active dataset",
-        description: "Please select another dataset before deleting this one.",
-        variant: "destructive"
-      })
-      return
-    }
-    
-    toast({
-      title: "Delete not implemented",
-      description: "The delete functionality will be available in a future update.",
-      variant: "destructive"
-    })
-  }
-  
   // Handle appearance save
   const handleAppearanceSave = () => {
     toast({
       title: "Appearance updated",
       description: "Your appearance settings have been saved successfully.",
-    })
-  }
-
-  // Handle dataset settings save
-  const handleDatasetSettingsSave = () => {
-    toast({
-      title: "Dataset settings updated",
-      description: "Your dataset retention settings have been saved successfully.",
     })
   }
 
@@ -274,7 +220,6 @@ export default function SettingsPage() {
       <Tabs defaultValue="datasets" className="space-y-4">
         <TabsList>
           <TabsTrigger value="profile">User Profile</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="datasets">Datasets</TabsTrigger>
         </TabsList>
@@ -339,78 +284,6 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>Configure how and when you receive notifications and alerts.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="emailAlerts">Email Alerts</Label>
-                    <p className="text-sm text-muted-foreground">Receive important alerts via email</p>
-                  </div>
-                  <Switch
-                    id="emailAlerts"
-                    checked={notifications.emailAlerts}
-                    onCheckedChange={() => handleNotificationToggle("emailAlerts")}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="weeklyReports">Weekly Reports</Label>
-                    <p className="text-sm text-muted-foreground">Receive weekly summary reports</p>
-                  </div>
-                  <Switch
-                    id="weeklyReports"
-                    checked={notifications.weeklyReports}
-                    onCheckedChange={() => handleNotificationToggle("weeklyReports")}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="insightAlerts">Insight Alerts</Label>
-                    <p className="text-sm text-muted-foreground">Receive alerts when new insights are available</p>
-                  </div>
-                  <Switch
-                    id="insightAlerts"
-                    checked={notifications.insightAlerts}
-                    onCheckedChange={() => handleNotificationToggle("insightAlerts")}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="dataUpdates">Data Update Notifications</Label>
-                    <p className="text-sm text-muted-foreground">Receive notifications when data is updated</p>
-                  </div>
-                  <Switch
-                    id="dataUpdates"
-                    checked={notifications.dataUpdates}
-                    onCheckedChange={() => handleNotificationToggle("dataUpdates")}
-                  />
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={handleNotificationSave}>
-                <Save className="mr-2 h-4 w-4" />
-                Save Preferences
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="appearance">
           <Card>
             <CardHeader>
@@ -425,43 +298,6 @@ export default function SettingsPage() {
                     <ModeToggle />
                     <span className="text-sm text-muted-foreground">Choose between light, dark, or system theme</span>
                   </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <Label htmlFor="density">Display Density</Label>
-                  <Select defaultValue="comfortable">
-                    <SelectTrigger id="density">
-                      <SelectValue placeholder="Select density" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="compact">Compact</SelectItem>
-                      <SelectItem value="comfortable">Comfortable</SelectItem>
-                      <SelectItem value="spacious">Spacious</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">Adjust the spacing between elements</p>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <Label htmlFor="defaultView">Default Dashboard View</Label>
-                  <Select defaultValue="overview">
-                    <SelectTrigger id="defaultView">
-                      <SelectValue placeholder="Select default view" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="overview">Overview</SelectItem>
-                      <SelectItem value="sales">Sales Analytics</SelectItem>
-                      <SelectItem value="products">Product Performance</SelectItem>
-                      <SelectItem value="customers">Customer Insights</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    Choose which view to show when you first open the dashboard
-                  </p>
                 </div>
               </div>
             </CardContent>
@@ -511,7 +347,6 @@ export default function SettingsPage() {
                           <TableHead>Upload Date</TableHead>
                           <TableHead>Size</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -527,17 +362,6 @@ export default function SettingsPage() {
                                 Active
                               </span>
                             </TableCell>
-                            <TableCell className="text-right">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => handleDeleteClick(dataset.id)}
-                                disabled={isLoading}
-                              >
-                                <Trash2 className="h-4 w-4 text-muted-foreground" />
-                                <span className="sr-only">Delete</span>
-                              </Button>
-                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -551,30 +375,7 @@ export default function SettingsPage() {
                   </div>
                 </>
               )}
-
-              <div className="space-y-2 mt-4">
-                <Label htmlFor="dataRetention">Data Retention Policy</Label>
-                <Select defaultValue="1year">
-                  <SelectTrigger id="dataRetention">
-                    <SelectValue placeholder="Select retention period" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3months">3 Months</SelectItem>
-                    <SelectItem value="6months">6 Months</SelectItem>
-                    <SelectItem value="1year">1 Year</SelectItem>
-                    <SelectItem value="2years">2 Years</SelectItem>
-                    <SelectItem value="indefinite">Indefinite</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">Choose how long to keep historical data</p>
-              </div>
             </CardContent>
-            <CardFooter>
-              <Button onClick={handleDatasetSettingsSave}>
-                <Save className="mr-2 h-4 w-4" />
-                Save Dataset Settings
-              </Button>
-            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>

@@ -3,7 +3,7 @@
 ## 5.1 Deployment
 
 ### 5.1.1 Deployment Scope
-The Revenue Prediction System is deployed as a **local development/production environment** with the capability for cloud deployment. The current implementation focuses on:
+The Intelligent Decision Support System (IDSS) is deployed as a **local development/production environment** with the capability for cloud deployment. The current implementation focuses on:
 
 - **Local Deployment**: Windows 10+ environment with cross-platform compatibility
 - **Single-Server Architecture**: Combined frontend and backend on localhost
@@ -143,7 +143,7 @@ The system uses a **CSV-based data storage** approach rather than traditional da
 
 **Rationale**:
 - Simplicity for small business environments
-- Easy data import/export capabilities
+- Easy data import capabilities
 - No database server maintenance required
 - Direct ML model compatibility
 
@@ -467,7 +467,7 @@ Identical structure to primary dataset for seamless integration.
     3. Render parameter selection controls
     4. Handle forecast generation with loading states
     5. Display interactive charts with confidence intervals
-    6. Show forecast data table with export options
+    6. Show forecast data table with interactive options
     7. Support metric switching (revenue/quantity/profit)
     ```
 
@@ -746,7 +746,7 @@ except Exception as e:
 - ✅ Interactive forecasting with multiple products/locations
 - ✅ Prioritized business insights (0-100 scoring)
 - ✅ Data management with CSV upload capabilities
-- ✅ Export functionality for reports and analysis
+- ✅ Interactive data visualization with charts
 
 ### 5.10.2 Deviations from Original Plan
 
@@ -772,10 +772,10 @@ except Exception as e:
 - Test coverage: 83.3% success rate across comprehensive testing ✅
 
 **Business Value Delivered**:
-- Complete revenue prediction system for small businesses
+- Complete intelligent decision support system for small businesses
 - Advanced forecasting capabilities with confidence intervals
 - Automated business intelligence with actionable recommendations
 - Professional user interface accessible to non-technical users
 - Production-ready deployment with enterprise-grade features
 
-The implementation successfully delivers a comprehensive revenue prediction system that exceeds the original FYP objectives while maintaining high code quality, performance standards, and user experience principles. 
+The implementation successfully delivers a comprehensive intelligent decision support system that exceeds the original FYP objectives while maintaining high code quality, performance standards, and user experience principles. 

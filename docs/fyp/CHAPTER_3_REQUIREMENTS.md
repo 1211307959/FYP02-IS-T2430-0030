@@ -2,7 +2,7 @@
 
 ## 3.1 Introduction
 
-The Revenue Prediction System is a comprehensive machine learning-powered web application designed to help small businesses make data-driven decisions regarding pricing, sales forecasting, and revenue optimization. The system integrates advanced ML algorithms with intuitive user interfaces to provide actionable business insights.
+The Intelligent Decision Support System (IDSS) is a comprehensive machine learning-powered web application designed to help small businesses make data-driven decisions regarding pricing, sales forecasting, and revenue optimization. The system integrates advanced ML algorithms with intuitive user interfaces to provide actionable business insights.
 
 ## 3.2 System Overview
 
@@ -70,7 +70,7 @@ The system consists of:
 - **FR7.2** Navigation between Dashboard, Forecasting, Insights, Scenario Planning
 - **FR7.3** Interactive charts and data visualizations
 - **FR7.4** Real-time data updates without page refresh
-- **FR7.5** Export functionality for reports and charts
+- **FR7.5** Interactive data visualization with charts
 
 #### FR8: System Integration
 - **FR8.1** RESTful API endpoints for all major functions
@@ -138,32 +138,18 @@ The system consists of:
 - **UR1.5** Receive prioritized business insights and recommendations
 - **UR1.6** Perform what-if analysis for different pricing scenarios
 - **UR1.7** Compare performance across products and locations
-- **UR1.8** Export reports for presentation to stakeholders
+- **UR1.8** View visualized data for business analysis
+- **UR1.9** Monitor system health and performance
+- **UR1.10** Reload data sources when needed
+- **UR1.11** Access detailed API endpoints for integration
+- **UR1.12** Review system logs and error reports
 
 **Key User Journeys**:
 1. **Daily Dashboard Review**: Login → View Dashboard → Check key metrics → Review recent insights
 2. **Pricing Decision**: Navigate to Scenario Planner → Input product details → Test price variations → Review optimization recommendations
-3. **Sales Planning**: Go to Forecasting → Select products/locations → Generate forecasts → Download reports
+3. **Sales Planning**: Go to Forecasting → Select products/locations → Generate forecasts → View interactive charts
 4. **Performance Analysis**: Visit Insights → Review automated insights → Implement recommended actions
-
-#### UR2: Data Analyst/Administrator
-**Secondary User**: Technical staff responsible for data management
-
-**Core Capabilities**:
-- **UR2.1** Upload and validate new business data files
-- **UR2.2** Monitor system health and performance
-- **UR2.3** Reload data sources when needed
-- **UR2.4** Access detailed API endpoints for integration
-- **UR2.5** Review system logs and error reports
-
-#### UR3: Executive/Stakeholder
-**Tertiary User**: Senior management requiring high-level insights
-
-**Core Capabilities**:
-- **UR3.1** View executive dashboard with summary metrics
-- **UR3.2** Access strategic business insights and trends
-- **UR3.3** Review forecasting reports for business planning
-- **UR3.4** Export presentation-ready charts and data
+5. **Data Management**: Upload CSV files → Validate data → Monitor system status → Reload data when needed
 
 ---
 
@@ -182,9 +168,7 @@ The system consists of:
 - ✅ **Reliability**: Graceful error handling and consistent results
 
 ### 3.4.3 User Requirements Satisfaction
-- ✅ **Business Owners**: All core business functions available
-- ✅ **Data Analysts**: Complete data management capabilities
-- ✅ **Executives**: High-level insights and reporting features
+- ✅ **Business Owner**: All core business functions available
 
 ---
 
@@ -205,10 +189,10 @@ The system consists of:
 
 ## 3.6 Summary
 
-The Revenue Prediction System successfully addresses all identified business requirements through a comprehensive implementation covering data management, ML-powered predictions, advanced forecasting, and intuitive user interfaces. The system demonstrates strong compliance with both functional and non-functional requirements, making it suitable for production deployment in small business environments.
+The Intelligent Decision Support System (IDSS) successfully addresses all identified business requirements through a comprehensive implementation covering data management, ML-powered predictions, advanced forecasting, and intuitive user interfaces. The system demonstrates strong compliance with both functional and non-functional requirements, making it suitable for production deployment in small business environments.
 
 **Key Achievements**:
 - Complete implementation of 45+ functional requirements
 - Strong performance metrics exceeding targets
-- Comprehensive user experience across all stakeholder types
+- Comprehensive user experience for business owners
 - Production-ready system with 83.3% test success rate 

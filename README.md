@@ -14,6 +14,7 @@ A production-ready web-based decision support system that leverages ethical mach
 - **Price Elasticity Modeling**: Economic-based quantity and revenue predictions
 - **Temporal Analytics**: Seasonal, holiday, and weekday pattern analysis
 - **Location Intelligence**: Multi-location aggregation and comparison
+- **Manual Data Entry**: Calendar date picker with custom product/location support
 
 **Target Users**: Small business owners, retail managers, e-commerce operators, data analysts
 
@@ -133,7 +134,8 @@ npm run dev
 ## Usage
 1. **Data Management**:
    - Upload CSV files with sales data
-   - System automatically combines all data files
+   - Manually add single transactions using the **Manual Entry** tab (calendar date picker, custom product/location)
+   - System automatically combines all data files and manual entries
    - Required columns: Date, ProductID, Location, UnitPrice, UnitCost, Quantity
 
 2. **Dashboard**:
@@ -177,6 +179,7 @@ npm run dev
 | Responsive Design | Mobile, tablet, and desktop support |
 | Dynamic Insights | Data-driven business recommendations |
 | Multi-file Processing | Automatic combination of all CSV data files |
+| Manual Data Entry | Calendar picker + custom product/location |
 | Business Intelligence | Product, location, and seasonal performance analysis |
 
 ## Screenshots

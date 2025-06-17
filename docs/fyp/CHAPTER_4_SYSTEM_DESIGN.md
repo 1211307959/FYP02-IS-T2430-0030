@@ -2,12 +2,10 @@
 
 ## 4.1 Rich Picture Diagram Description
 
-The Revenue Prediction System operates as an integrated ecosystem with the following core components:
+The Intelligent Decision Support System (IDSS) operates as an integrated ecosystem with the following core components:
 
 ### Core Actors:
 - **Business Owner/Manager**: Primary user who uploads data, views dashboards, generates forecasts
-- **Data Analyst**: Secondary user who manages data sources and system configuration
-- **External System**: CSV data sources, potential future integrations
 
 ### System Modules:
 - **Data Input Layer**: File upload, manual entry, data validation
@@ -28,6 +26,23 @@ The Revenue Prediction System operates as an integrated ecosystem with the follo
 - Analytics engine creates business insights
 - User receives actionable recommendations through intuitive UI
 
+```mermaid
+graph TD
+  BusinessOwner("Business Owner / Manager") -->|"Uploads & views data"| DataInput
+
+  subgraph "Intelligent Decision Support System"
+    DataInput["Data Input Layer\n(File Upload + Manual Entry)"]
+    ML["ML Engine\n(Ethical LightGBM)"]
+    Analytics["Analytics Engine\n(Forecasting & Insights)"]
+    UI["Presentation Layer\n(Dashboard & Reports)"]
+  end
+
+  DataInput -->|"Validated data"| ML
+  ML -->|"Predictions"| Analytics
+  Analytics -->|"Forecasts & Insights"| UI
+  ML -->|"Model metrics"| UI
+```
+
 ---
 
 ## 4.2 Use Case Diagram
@@ -39,16 +54,6 @@ The Revenue Prediction System operates as an integrated ecosystem with the follo
 - **UC4**: Create Sales Forecasts
 - **UC5**: Perform Scenario Planning
 - **UC6**: View Business Insights
-- **UC7**: Export Reports
-
-### Secondary Actor: Data Administrator
-- **UC8**: Manage Data Sources
-- **UC9**: Monitor System Health
-- **UC10**: Reload System Data
-
-### External System Actor
-- **UC11**: Provide CSV Data Files
-- **UC12**: Validate Data Format
 
 ### Use Case Relationships:
 - UC3 **extends** UC1 (predictions shown on dashboard)
@@ -60,8 +65,6 @@ The Revenue Prediction System operates as an integrated ecosystem with the follo
 graph TB
     subgraph "Actors"
         BO["Business Owner/<br/>Manager"]
-        DA["Data<br/>Administrator"]
-        ES["External<br/>System"]
     end
     
     subgraph "Core Use Cases"
@@ -71,16 +74,6 @@ graph TB
         UC4["Create Sales<br/>Forecasts"]
         UC5["Perform Scenario<br/>Planning"]
         UC6["View Business<br/>Insights"]
-        UC7["Export<br/>Reports"]
-    end
-    
-    subgraph "Admin Use Cases"
-        UC8["Manage Data<br/>Sources"]
-        UC9["Monitor System<br/>Health"]
-        UC10["Reload System<br/>Data"]
-    end
-    
-    subgraph "System Use Cases"
         UC11["Provide CSV<br/>Data Files"]
         UC12["Validate Data<br/>Format"]
     end
@@ -92,16 +85,8 @@ graph TB
     BO --> UC4
     BO --> UC5
     BO --> UC6
-    BO --> UC7
-    
-    %% Secondary Actor Connections
-    DA --> UC8
-    DA --> UC9
-    DA --> UC10
-    
-    %% External System Connections
-    ES --> UC11
-    ES --> UC12
+    BO --> UC11
+    BO --> UC12
     
     %% Use Case Relationships
     UC3 -.->|extends| UC1
@@ -110,9 +95,8 @@ graph TB
     UC6 -.->|includes| UC1
     UC6 -.->|includes| UC3
     UC6 -.->|includes| UC4
+    UC12 -.->|includes| UC2
 ```
-
-
 
 ---
 
@@ -141,7 +125,7 @@ graph TB
 14. Choose automatic (30-day) or custom date range
 15. Select products and locations for forecast
 16. Generate forecast with confidence intervals
-17. Review charts and export reports if needed
+17. Review charts with visualized data
 
 **Phase 4: Business Intelligence**
 18. Navigate to Insights section
@@ -184,7 +168,7 @@ flowchart TD
     O --> Q["Select Products & Locations"]
     P --> Q
     Q --> R["Generate Forecast with Confidence Intervals"]
-    R --> S["Review Charts & Export Reports"]
+    R --> S["Review Forecast Charts & Data"]
     
     S --> T["Navigate to Insights Section"]
     T --> U["Review Auto-Generated Insights"]
@@ -498,7 +482,7 @@ sequenceDiagram
 
 The sequence diagram above illustrates three main interaction flows:
 
-#### Revenue Prediction Flow (Steps 1-12):
+#### Revenue Prediction Flow (Steps 1-9):
 1. User inputs prediction parameters (product, location, price, cost)
 2. Frontend validates and sends POST request to Flask API
 3. API validates input data through Data Manager
@@ -509,7 +493,7 @@ The sequence diagram above illustrates three main interaction flows:
 8. Results returned to frontend as JSON
 9. User sees prediction with visual charts
 
-#### Sales Forecasting Flow (Steps 13-24):
+#### Sales Forecasting Flow (Steps 10-16):
 10. User selects forecast parameters (date range, products)
 11. API retrieves available options from Data Manager
 12. ML Engine generates time series forecast
@@ -518,7 +502,7 @@ The sequence diagram above illustrates three main interaction flows:
 15. Complete forecast array returned to frontend
 16. User views interactive forecast chart
 
-#### Business Insights Flow (Steps 25-36):
+#### Business Insights Flow (Steps 17-23):
 17. User navigates to insights section
 18. API loads complete business dataset
 19. Data Manager queries all transaction records
@@ -585,7 +569,7 @@ The sequence diagram above illustrates three main interaction flows:
 - Generate automatic 30-day forecasts
 - Create custom date range forecasts
 - Compare multiple product forecasts
-- Export forecast data
+- Visualize forecast data
 - Adjust forecast parameters
 
 **Key Features**:
@@ -646,7 +630,7 @@ The sequence diagram above illustrates three main interaction flows:
 - Run price optimization analysis
 - Compare multiple scenarios
 - Save scenario configurations
-- Export scenario reports
+- Visualize scenario results
 
 ### 4.6.5 Data Input Page (`/data-input`)
 
@@ -670,27 +654,3 @@ The sequence diagram above illustrates three main interaction flows:
 - Validate data format
 - Preview imported data
 - Manage data sources
-
-### Differences from Original FYP Plan:
-
-**Enhanced Features Implemented**:
-- **Advanced ML Model**: Upgraded from basic regression to LightGBM with ethical features
-- **Comprehensive Insights**: Added AI-powered business intelligence beyond original scope
-- **Real-time Dashboard**: Implemented live metrics not in original plan
-- **Vectorized Processing**: Added enterprise-scale batch processing capabilities
-- **Dynamic Data Loading**: Future-proof system with automatic adaptation
-
-**UI/UX Improvements**:
-- **Modern Design System**: Radix UI components with Tailwind CSS
-- **Interactive Charts**: Recharts integration for dynamic visualizations
-- **Responsive Design**: Mobile-first approach not specified in original plan
-- **Progressive Loading**: Skeleton screens and loading states for better UX
-- **Error Handling**: Comprehensive user feedback for all operations
-
-**Architecture Evolution**:
-- **Microservices Approach**: Separated concerns between ML, API, and UI layers
-- **API-First Design**: RESTful endpoints enabling future integrations
-- **Performance Optimization**: Caching and vectorized operations for scalability
-- **Production Readiness**: Error resilience and monitoring capabilities
-
-The implemented system significantly exceeds the original FYP scope with enterprise-grade features, modern UI/UX design, and production-ready architecture while maintaining the core business intelligence objectives. 
