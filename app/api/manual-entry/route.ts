@@ -43,6 +43,24 @@ export async function POST(request: NextRequest) {
     // Write the CSV file
     fs.writeFileSync(filePath, header + row);
     
+    // Trigger backend data reload so dashboard updates immediately
+    try {
+      const reloadResponse = await fetch('http://localhost:5000/reload-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (reloadResponse.ok) {
+        console.log('Backend data reloaded successfully after manual entry');
+      } else {
+        console.warn('Backend data reload failed, but manual entry was saved');
+      }
+    } catch (reloadError) {
+      console.warn('Could not trigger backend reload, but manual entry was saved:', reloadError);
+    }
+    
     return NextResponse.json({
       success: true,
       filename,

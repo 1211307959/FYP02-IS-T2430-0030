@@ -18,7 +18,8 @@ export async function GET() {
       const files = (await fs.readdir(dataDir)).filter(file => file.toLowerCase().endsWith('.csv'));
       
       if (files.length === 0) {
-        throw new Error('No CSV files found in data directory');
+        console.log('No CSV files found in data directory - returning empty products list');
+        return NextResponse.json([]);
       }
       
       console.log('Using CSV data for products');
@@ -109,13 +110,9 @@ export async function GET() {
       } catch (apiError) {
         console.warn(`Failed to fetch API products: ${apiError}`);
         
-        // If API fails too, return fallback list with 47 products to match the data
-        const fallbackProducts = Array.from({ length: 47 }, (_, i) => ({
-          id: (i + 1).toString(), // Use numeric ID as string
-          name: `Product ${i + 1}` // Use a friendly name format
-        }));
-        
-        return NextResponse.json(fallbackProducts);
+        // If API fails and no CSV data, return empty array
+        console.log('No product data available from any source - returning empty array');
+        return NextResponse.json([]);
       }
     }
     

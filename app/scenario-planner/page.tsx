@@ -127,6 +127,17 @@ export default function ScenarioPlannerPage() {
         // Fetch products
         const productsData = await getProducts()
         
+        // Check if we have any products
+        if (!productsData || productsData.length === 0) {
+          console.log("No products available - clearing scenario data");
+          setProducts([]);
+          setLocations([]);
+          setOriginalScenario(initialScenario);
+          setSimulatedScenario(initialScenario);
+          setError("No product data available. Please upload CSV files to use the scenario planner.");
+          return;
+        }
+        
         // Map products to use numeric IDs
         const mappedProducts = productsData.map((product: any) => ({
           ...product,
@@ -137,9 +148,21 @@ export default function ScenarioPlannerPage() {
         
         // Fetch locations
         const locationsData = await getLocations()
+        
+        // Check if we have any locations
+        if (!locationsData || locationsData.length === 0) {
+          console.log("No locations available - clearing scenario data");
+          setProducts([]);
+          setLocations([]);
+          setOriginalScenario(initialScenario);
+          setSimulatedScenario(initialScenario);
+          setError("No location data available. Please upload CSV files to use the scenario planner.");
+          return;
+        }
+        
         setLocations(locationsData)
         
-        // Set default values only after data is loaded
+        // Set default values only after data is loaded and available
         if (mappedProducts.length > 0 && locationsData.length > 0) {
           console.log("Setting default product and location from loaded data");
           
@@ -174,6 +197,9 @@ export default function ScenarioPlannerPage() {
             price: defaultPrice,
             cost: defaultCost
           });
+          
+          // Clear any previous errors
+          setError("");
         }
       } catch (err) {
         console.error("Error loading options:", err)

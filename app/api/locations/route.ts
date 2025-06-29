@@ -33,7 +33,8 @@ export async function GET() {
       const files = (await fs.readdir(dataDir)).filter(file => file.toLowerCase().endsWith('.csv'));
       
       if (files.length === 0) {
-        throw new Error('No CSV files found in data directory');
+        console.log('No CSV files found in data directory - returning empty locations list');
+        return NextResponse.json([]);
       }
       
       console.log(`Processing ${files.length} CSV files for locations`);
@@ -150,23 +151,9 @@ export async function GET() {
       } catch (apiError: unknown) {
         console.warn(`Failed to fetch API locations: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
         
-        // Return a complete fallback list based on known data
-        const fallbackLocations = [
-          { id: 'All', name: 'All Locations' },
-          { id: 'Central', name: 'Central' },
-          { id: 'East', name: 'East' },
-          { id: 'North', name: 'North' },
-          { id: 'South', name: 'South' },
-          { id: 'West', name: 'West' }
-        ];
-        
-        // Cache the fallback response
-        responseCache = {
-          data: fallbackLocations,
-          timestamp: now
-        };
-        
-        return NextResponse.json(fallbackLocations);
+        // If API fails and no CSV data, return empty array
+        console.log('No location data available from any source - returning empty array');
+        return NextResponse.json([]);
       }
     }
     

@@ -57,7 +57,7 @@ DEFAULT_LOCATION = "North"
 DEFAULT_UNIT_PRICE = 100.0
 DEFAULT_UNIT_COST = 50.0
 
-def load_combined_data():
+def load_combined_data(force_reload=False):
     """Load and combine all CSV files from the data directory"""
     global COMBINED_DATA, LAST_LOAD_TIME
     
@@ -77,6 +77,16 @@ def load_combined_data():
             file_path = os.path.join(data_dir, file)
             try:
                 df = pd.read_csv(file_path)
+                
+                # Calculate missing Quantity if we have revenue and price
+                if 'Quantity' not in df.columns and 'Total Revenue' in df.columns and 'Unit Price' in df.columns:
+                    df['Quantity'] = df['Total Revenue'] / df['Unit Price'].replace(0, 1)  # Avoid division by zero
+                    df['Quantity'] = df['Quantity'].fillna(1)  # Default to 1 if calculation fails
+                
+                # Calculate missing Profit if we have cost, price and quantity
+                if 'Profit' not in df.columns and all(col in df.columns for col in ['Unit Cost', 'Unit Price', 'Quantity']):
+                    df['Profit'] = (df['Unit Price'] - df['Unit Cost']) * df['Quantity']
+                
                 all_dataframes.append(df)
                 print(f"Loaded {len(df)} rows from {file}")
             except Exception as e:
@@ -87,6 +97,10 @@ def load_combined_data():
             COMBINED_DATA = pd.concat(all_dataframes, ignore_index=True)
             LAST_LOAD_TIME = datetime.now()
             print(f"Successfully combined {len(all_dataframes)} files with {len(COMBINED_DATA)} total rows")
+            
+            # Print column summary for debugging
+            print(f"Combined data columns: {list(COMBINED_DATA.columns)}")
+            
             return True
         else:
             print("No valid CSV files could be loaded")
@@ -96,15 +110,39 @@ def load_combined_data():
         print(f"Error in load_combined_data: {e}")
         return False
 
-def ensure_data_loaded():
+def ensure_data_loaded(force_reload=False):
     """Ensure data is loaded, reload if necessary"""
     global COMBINED_DATA, LAST_LOAD_TIME
     
-    # Load data if not loaded or if it's been more than 30 minutes
-    if (COMBINED_DATA is None or 
+    # Check current files in data directory
+    data_dir = 'public/data'
+    current_files = []
+    if os.path.exists(data_dir):
+        current_files = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
+    
+    # Force reload if:
+    # 1. No data loaded yet
+    # 2. Force reload requested
+    # 3. Cache is older than 30 minutes
+    # 4. No CSV files exist (clear cache)
+    # 5. File count has changed (files added/removed)
+    should_reload = (
+        COMBINED_DATA is None or 
+        force_reload or
         LAST_LOAD_TIME is None or 
-        (datetime.now() - LAST_LOAD_TIME).seconds > 1800):
-        return load_combined_data()
+        (datetime.now() - LAST_LOAD_TIME).seconds > 1800 or
+        len(current_files) == 0  # No files exist - clear cache
+    )
+    
+    # If no CSV files exist, clear the cache and return False
+    if len(current_files) == 0:
+        print("No CSV files found - clearing cached data")
+        COMBINED_DATA = None
+        LAST_LOAD_TIME = None
+        return False
+    
+    if should_reload:
+        return load_combined_data(force_reload)
     
     return COMBINED_DATA is not None
 
@@ -697,15 +735,31 @@ def api_forecast_trend():
 def get_dashboard_data():
     """Get dashboard data from all data files combined"""
     try:
-        # Ensure data is loaded
+        # Ensure data is loaded - force reload if cache is stale
         if not ensure_data_loaded():
+            # No data available - return empty dashboard structure
+            print("No data files available - returning empty dashboard")
             return jsonify({
-                'status': 'error',
-                'error': 'No valid data available'
-            }), 404
+                'status': 'no_data',
+                'message': 'No CSV data files found',
+                'revenue_data': [],
+                'product_revenue_data': [],
+                'location_data': [],
+                'top_products_data': [],
+                'total_revenue': 0,
+                'total_sales': 0,
+                'avg_revenue': 0,
+                'growth_revenue': 0,
+                'growth_sales': 0,
+                'growth_avg_revenue': 0
+            })
         
         # Use the combined dataframe
         df = COMBINED_DATA.copy()
+        
+        # Debug: Print current data info
+        csv_files = [f for f in os.listdir('public/data') if f.endswith('.csv')] if os.path.exists('public/data') else []
+        print(f"Dashboard data request: {len(df)} rows, {len(csv_files)} CSV files loaded")
         
         # Perform initial validation of required columns
         required_columns = ['_ProductID', 'Unit Price', 'Unit Cost', 'Total Revenue']
@@ -1102,7 +1156,7 @@ def get_business_insights():
 def reload_data_endpoint():
     """Manually reload all CSV data files"""
     try:
-        success = load_combined_data()
+        success = load_combined_data(force_reload=True)
         if success:
             return jsonify({
                 'status': 'success',

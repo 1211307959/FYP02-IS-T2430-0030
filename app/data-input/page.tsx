@@ -590,12 +590,11 @@ export default function DataInputPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-12 text-xs">ID</TableHead>
-                        <TableHead className="text-xs">Product</TableHead>
-                        <TableHead className="text-xs">Customer</TableHead>
-                        <TableHead className="text-xs">Unit Price</TableHead>
-                        <TableHead className="text-xs">Unit Cost</TableHead>
-                        <TableHead className="text-xs">Quantity</TableHead>
-                        <TableHead className="text-xs">Date</TableHead>
+                        {previewData.length > 0 && Object.keys(previewData[0]).filter(key => key !== 'id').map((key) => (
+                          <TableHead key={key} className="text-xs">
+                            {key.replace(/^_/, '').replace(/([A-Z])/g, ' $1').replace(/^\w/, (c) => c.toUpperCase())}
+                          </TableHead>
+                        ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -606,12 +605,15 @@ export default function DataInputPage() {
                           onClick={() => handleRowSelect(index)}
                         >
                           <TableCell className="text-xs font-medium">{row.id}</TableCell>
-                          <TableCell className="text-xs">{row._ProductID}</TableCell>
-                          <TableCell className="text-xs">{row._CustomerID}</TableCell>
-                          <TableCell className="text-xs">${row["Unit Price"]}</TableCell>
-                          <TableCell className="text-xs">${row["Unit Cost"]}</TableCell>
-                          <TableCell className="text-xs">{row["Order Quantity"]}</TableCell>
-                          <TableCell className="text-xs">{`${row.Month}/${row.Day} (${row.Weekday})`}</TableCell>
+                          {Object.keys(row).filter(key => key !== 'id').map((key) => (
+                            <TableCell key={key} className="text-xs">
+                              {typeof row[key] === 'number' && key.toLowerCase().includes('price') 
+                                ? `$${row[key]}` 
+                                : key === 'Month' || key === 'Day' || key === 'Weekday' 
+                                ? `${row.Month}/${row.Day} (${row.Weekday})`
+                                : row[key]}
+                            </TableCell>
+                          ))}
                         </TableRow>
                       ))}
                     </TableBody>

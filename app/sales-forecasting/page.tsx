@@ -524,22 +524,52 @@ export default function SalesForecastingPage() {
         const productsData = await getProducts();
         let mappedProducts: Product[] = [];
         
-        if (productsData && Array.isArray(productsData)) {
+        if (productsData && Array.isArray(productsData) && productsData.length > 0) {
           mappedProducts = productsData.map((product: any) => ({
             id: product.id || product.toString(),
             name: product.name || `Product ${product}`
           }));
+        } else {
+          console.log("No products available - clearing forecast data");
+          setProducts([]);
+          setLocations([]);
+          setSelectedProduct("");
+          setSelectedLocation("");
+          setIsLoadingOptions(false);
+          setAllProductsForecast(null);
+          setForecastResult(null);
+          toast({
+            title: "No Data Available",
+            description: "No product data found. Please upload CSV files to use sales forecasting.",
+            variant: "destructive",
+          });
+          return;
         }
         
         console.log("Getting locations data...");
         const locationsData = await getLocations();
         let mappedLocations: Location[] = [];
         
-        if (locationsData && Array.isArray(locationsData)) {
+        if (locationsData && Array.isArray(locationsData) && locationsData.length > 0) {
           mappedLocations = locationsData.map((location: any) => ({
             id: typeof location === 'string' ? location : location.id,
             name: typeof location === 'string' ? location : location.name
           }));
+        } else {
+          console.log("No locations available - clearing forecast data");
+          setProducts([]);
+          setLocations([]);
+          setSelectedProduct("");
+          setSelectedLocation("");
+          setIsLoadingOptions(false);
+          setAllProductsForecast(null);
+          setForecastResult(null);
+          toast({
+            title: "No Data Available",
+            description: "No location data found. Please upload CSV files to use sales forecasting.",
+            variant: "destructive",
+          });
+          return;
         }
         
         // Set default values
@@ -1779,8 +1809,8 @@ export default function SalesForecastingPage() {
                       <div className="relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary" 
                            onClick={() => setShowCustomRevenue(!showCustomRevenue)}
                            style={{ backgroundColor: showCustomRevenue ? '#2563eb' : '#d1d5db' }}>
-                        <span className={`${showCustomRevenue ? 'translate-x-4' : 'translate-x-0'} inline-block h-3 w-3 rounded-full bg-white transition-transform`}></span>
-                      </div>
+                            <span className={`${showCustomRevenue ? 'translate-x-4' : 'translate-x-0'} inline-block h-3 w-3 rounded-full bg-white transition-transform`}></span>
+                          </div>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Label htmlFor="custom-show-profit" className="text-sm font-medium text-green-600">
@@ -1789,8 +1819,8 @@ export default function SalesForecastingPage() {
                       <div className="relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary" 
                            onClick={() => setShowCustomProfit(!showCustomProfit)}
                            style={{ backgroundColor: showCustomProfit ? '#16a34a' : '#d1d5db' }}>
-                        <span className={`${showCustomProfit ? 'translate-x-4' : 'translate-x-0'} inline-block h-3 w-3 rounded-full bg-white transition-transform`}></span>
-                      </div>
+                            <span className={`${showCustomProfit ? 'translate-x-4' : 'translate-x-0'} inline-block h-3 w-3 rounded-full bg-white transition-transform`}></span>
+                          </div>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Label htmlFor="custom-show-quantity" className="text-sm font-medium text-orange-600">
@@ -1799,8 +1829,8 @@ export default function SalesForecastingPage() {
                       <div className="relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary" 
                            onClick={() => setShowCustomQuantity(!showCustomQuantity)}
                            style={{ backgroundColor: showCustomQuantity ? '#ea580c' : '#d1d5db' }}>
-                        <span className={`${showCustomQuantity ? 'translate-x-4' : 'translate-x-0'} inline-block h-3 w-3 rounded-full bg-white transition-transform`}></span>
-                      </div>
+                            <span className={`${showCustomQuantity ? 'translate-x-4' : 'translate-x-0'} inline-block h-3 w-3 rounded-full bg-white transition-transform`}></span>
+                          </div>
                     </div>
                   </div>
                         <ResponsiveContainer width="100%" height="100%">

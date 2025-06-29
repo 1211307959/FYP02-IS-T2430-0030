@@ -2,63 +2,9 @@
   {
     "insight_id": "REV001",
     "title": "Your Business Can Make More Money",
-    "predicted_value": -5458826.300985305,
+    "predicted_value": -5467231.447451425,
     "prediction_type": "revenue_optimization_potential",
-    "predicted_at": "2025-06-13T01:41:30.390457",
-    "status": "pending",
-    "tracking_period_weeks": 4
-  },
-  {
-    "insight_id": "REV001",
-    "title": "Your Business Can Make More Money",
-    "predicted_value": -5458826.300985305,
-    "prediction_type": "revenue_optimization_potential",
-    "predicted_at": "2025-06-13T01:41:30.424827",
-    "status": "pending",
-    "tracking_period_weeks": 4
-  },
-  {
-    "insight_id": "LOC001",
-    "title": "Some Locations Are Doing Much Better Than Others",
-    "predicted_value": 0.999999288197163,
-    "prediction_type": "location_gap_reduction",
-    "predicted_at": "2025-06-13T01:41:30.451816",
-    "status": "pending",
-    "tracking_period_weeks": 4
-  },
-  {
-    "insight_id": "LOC001",
-    "title": "Some Locations Are Doing Much Better Than Others",
-    "predicted_value": 0.999999288197163,
-    "prediction_type": "location_gap_reduction",
-    "predicted_at": "2025-06-13T01:41:30.488828",
-    "status": "pending",
-    "tracking_period_weeks": 4
-  },
-  {
-    "insight_id": "PROD001",
-    "title": "Some Products Are Way Better Than Others",
-    "predicted_value": 218813499.48,
-    "prediction_type": "product_portfolio_optimization",
-    "predicted_at": "2025-06-13T01:41:30.558347",
-    "status": "pending",
-    "tracking_period_weeks": 4
-  },
-  {
-    "insight_id": "PROD001",
-    "title": "Some Products Are Way Better Than Others",
-    "predicted_value": 218813499.48,
-    "prediction_type": "product_portfolio_optimization",
-    "predicted_at": "2025-06-13T01:41:30.593891",
-    "status": "pending",
-    "tracking_period_weeks": 4
-  },
-  {
-    "insight_id": "PRICE001",
-    "title": "Your Prices Are All Over the Place",
-    "predicted_value": 0.11597248115993972,
-    "prediction_type": "price_standardization_impact",
-    "predicted_at": "2025-06-13T19:45:33.609799",
+    "predicted_at": "2025-06-25T16:07:38.664456",
     "status": "pending",
     "tracking_period_weeks": 4
   },
@@ -67,25 +13,205 @@
     "title": "Your Business Can Make More Money",
     "predicted_value": -5467231.447451425,
     "prediction_type": "revenue_optimization_potential",
-    "predicted_at": "2025-06-13T19:45:33.641488",
+    "predicted_at": "2025-06-25T16:07:38.669210",
     "status": "pending",
     "tracking_period_weeks": 4
   },
   {
     "insight_id": "PRICE001",
     "title": "Your Prices Are All Over the Place",
-    "predicted_value": 0.11597248115993972,
+    "predicted_value": 0.11597407385015537,
     "prediction_type": "price_standardization_impact",
-    "predicted_at": "2025-06-16T17:32:42.527544",
+    "predicted_at": "2025-06-25T16:21:35.740329",
     "status": "pending",
     "tracking_period_weeks": 4
   },
   {
     "insight_id": "REV001",
     "title": "Your Business Can Make More Money",
-    "predicted_value": -5467231.447451425,
+    "predicted_value": -5457615.8868499985,
     "prediction_type": "revenue_optimization_potential",
-    "predicted_at": "2025-06-16T17:32:42.542105",
+    "predicted_at": "2025-06-25T16:21:35.854430",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "PRICE001",
+    "title": "Your Prices Are All Over the Place",
+    "predicted_value": 0.11597407385015537,
+    "prediction_type": "price_standardization_impact",
+    "predicted_at": "2025-06-25T16:21:36.151366",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "REV001",
+    "title": "Your Business Can Make More Money",
+    "predicted_value": -5457615.8868499985,
+    "prediction_type": "revenue_optimization_potential",
+    "predicted_at": "2025-06-25T16:21:36.235924",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "COMP001",
+    "title": "Big Problem: Low Sales AND Uneven Products",
+    "predicted_value": 300410061.87499994,
+    "prediction_type": "compound_revenue_product_optimization",
+    "predicted_at": "2025-06-25T16:26:47.623634",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "PRICE001",
+    "title": "Your Prices Are All Over the Place",
+    "predicted_value": 0.11597617728167338,
+    "prediction_type": "price_standardization_impact",
+    "predicted_at": "2025-06-25T16:26:47.646693",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "REV001",
+    "title": "Your Business Can Make More Money",
+    "predicted_value": -5465703.300985254,
+    "prediction_type": "revenue_optimization_potential",
+    "predicted_at": "2025-06-25T16:26:47.660762",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "PROD001",
+    "title": "Some Products Are Way Better Than Others",
+    "predicted_value": 218730975.48,
+    "prediction_type": "product_portfolio_optimization",
+    "predicted_at": "2025-06-25T16:26:47.673270",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "PRICE001",
+    "title": "Your Prices Are All Over the Place",
+    "predicted_value": 0.11597407385015537,
+    "prediction_type": "price_standardization_impact",
+    "predicted_at": "2025-06-25T16:42:43.728675",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "REV001",
+    "title": "Your Business Can Make More Money",
+    "predicted_value": -5457615.8868499985,
+    "prediction_type": "revenue_optimization_potential",
+    "predicted_at": "2025-06-25T16:42:43.769057",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "PRICE001",
+    "title": "Your Prices Are All Over the Place",
+    "predicted_value": 0.115880896758402,
+    "prediction_type": "price_standardization_impact",
+    "predicted_at": "2025-06-25T17:05:28.559891",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "REV001",
+    "title": "Your Business Can Make More Money",
+    "predicted_value": -3055337.6355174896,
+    "prediction_type": "revenue_optimization_potential",
+    "predicted_at": "2025-06-25T17:05:28.597565",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "COMP001",
+    "title": "Big Problem: Low Sales AND Uneven Products",
+    "predicted_value": 14979682.178999998,
+    "prediction_type": "compound_revenue_product_optimization",
+    "predicted_at": "2025-06-25T17:11:43.269069",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "PRICE001",
+    "title": "Your Prices Are All Over the Place",
+    "predicted_value": 0.11615506685677218,
+    "prediction_type": "price_standardization_impact",
+    "predicted_at": "2025-06-25T17:11:43.316833",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "REV001",
+    "title": "Your Business Can Make More Money",
+    "predicted_value": -3057447.333795697,
+    "prediction_type": "revenue_optimization_potential",
+    "predicted_at": "2025-06-25T17:11:43.348676",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "LOC001",
+    "title": "Some Locations Are Doing Much Better Than Others",
+    "predicted_value": 0.9980288423532078,
+    "prediction_type": "location_gap_reduction",
+    "predicted_at": "2025-06-25T17:11:43.373360",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "PROD001",
+    "title": "Some Products Are Way Better Than Others",
+    "predicted_value": 10769499.3,
+    "prediction_type": "product_portfolio_optimization",
+    "predicted_at": "2025-06-25T17:11:43.397106",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "COMP001",
+    "title": "Big Problem: Low Sales AND Uneven Products",
+    "predicted_value": 14979682.178999998,
+    "prediction_type": "compound_revenue_product_optimization",
+    "predicted_at": "2025-06-25T17:11:46.468673",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "PRICE001",
+    "title": "Your Prices Are All Over the Place",
+    "predicted_value": 0.11615506685677218,
+    "prediction_type": "price_standardization_impact",
+    "predicted_at": "2025-06-25T17:11:46.490875",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "REV001",
+    "title": "Your Business Can Make More Money",
+    "predicted_value": -3057447.333795697,
+    "prediction_type": "revenue_optimization_potential",
+    "predicted_at": "2025-06-25T17:11:46.517425",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "LOC001",
+    "title": "Some Locations Are Doing Much Better Than Others",
+    "predicted_value": 0.9980288423532078,
+    "prediction_type": "location_gap_reduction",
+    "predicted_at": "2025-06-25T17:11:46.544532",
+    "status": "pending",
+    "tracking_period_weeks": 4
+  },
+  {
+    "insight_id": "PROD001",
+    "title": "Some Products Are Way Better Than Others",
+    "predicted_value": 10769499.3,
+    "prediction_type": "product_portfolio_optimization",
+    "predicted_at": "2025-06-25T17:11:46.564202",
     "status": "pending",
     "tracking_period_weeks": 4
   }

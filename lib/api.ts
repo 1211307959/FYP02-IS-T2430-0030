@@ -161,6 +161,14 @@ export async function getLocations() {
     
     const data = await response.json();
     
+    // Check if the response indicates no data available
+    if (!data || data.length === 0) {
+      console.log("No location data available");
+      cachedLocations = [];
+      lastCacheTime = now;
+      return [];
+    }
+    
     // Update cache
     cachedLocations = data;
     lastCacheTime = now;
@@ -168,6 +176,8 @@ export async function getLocations() {
     return data;
   } catch (error) {
     console.error('Error fetching locations:', error);
+    // Clear cache on error
+    cachedLocations = [];
     return [];
   }
 }
@@ -191,6 +201,14 @@ export async function getProducts() {
     
     const data = await response.json();
     console.log("Raw product data:", data);
+    
+    // Check if the response indicates no data available
+    if (!data || data.length === 0) {
+      console.log("No product data available");
+      cachedProducts = [];
+      lastCacheTime = now;
+      return [];
+    }
     
     // Transform product data to ensure consistent format
     const transformedProducts = data.map((product: any) => {

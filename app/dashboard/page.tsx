@@ -275,6 +275,25 @@ export default function DashboardPage() {
       
       console.log("Dashboard data received:", data);
       
+      // Check if we received a no_data status (when all files are removed)
+      if (data.status === 'no_data') {
+        console.log("No data files available - clearing dashboard");
+        
+        // Clear all data states
+        setTopProductsData([]);
+        setAllProductsData([]);
+        setRevenueData([]);
+        setFilteredRevenueData([]);
+        setProductRevenueData([]);
+        setLocationRevenueData([]);
+        setTotalPredictedRevenue(0);
+        setTotalSales(0);
+        setAverageRevenuePerSale(0);
+        
+        setError("No data files found. Please upload CSV files to view dashboard data.");
+        return;
+      }
+      
       // Process product data
       const { topProducts, allProducts } = processProductData(data);
       
